@@ -2,7 +2,7 @@ using MelonLoader;
 
 // CONFIRMED against the real install's SH_Data/app.info, which literally contains these
 // two strings on their own lines.
-[assembly: MelonInfo(typeof(SuperhotArchipelago.Core.Mod), "SuperhotArchipelago", "0.0.1", "Michael")]
+[assembly: MelonInfo(typeof(SuperhotArchipelago.Core.Mod), "SuperhotArchipelago", "0.1.0", "Michael")]
 [assembly: MelonGame("SUPERHOT_Team", "SUPERHOT")]
 
 namespace SuperhotArchipelago.Core
