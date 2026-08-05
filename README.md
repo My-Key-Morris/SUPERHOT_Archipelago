@@ -1,75 +1,126 @@
-# SUPERHOT Archipelago Integration
+# SUPERHOT Archipelago
 
-Goal: make SUPERHOT (2016, original — not MIND CONTROL DELETE) playable as a game slot in
+The original SUPERHOT (2016 — not MIND CONTROL DELETE) as a playable game slot in
 [Archipelago](https://archipelago.gg), the multi-game randomizer.
 
-This has two halves:
+⚠ *Solo-tested on Windows, one machine, one game install. Still beta — see [Status](#status--known-limitations) below.* ⚠
 
-1. **`apworld/superhot/`** — the Python world definition that plugs into Archipelago's
-   generator. Defines the item pool, the location pool, and the logic connecting them.
-2. **`mod/SuperhotArchipelago/`** — a [MelonLoader](https://melonwiki.xyz) mod that runs
-   inside the SUPERHOT process. It detects in-game events (level completions, in-level
-   secrets found) and reports them to the Archipelago server as "checks," and applies
-   items you receive from other players (level unlocks) back into the game.
+## Required Software
 
-See `ARCHITECTURE.md` for a full file-by-file breakdown of both halves, `TESTING.md` for
-how to run this yourself, and `NOTES.md` for the dated log of every real bug found (mostly
-via actual playtesting against the real game) and how it was fixed.
+- SUPERHOT: [Steam Store](https://store.steampowered.com/app/322500)
+- Archipelago: [Releases Page](https://github.com/ArchipelagoMW/Archipelago/releases/latest)
+- This apworld: [Releases Page](<your-repo-url>/releases/latest) *(update once the repo is up)*
+- [MelonLoader](https://melonwiki.xyz) — the mod loader the in-game half runs on
 
-## Design (revised after seeing the real game code, and after real playtesting)
+**See [TESTING.md](TESTING.md) for the full first-time setup walkthrough.**
+
+## What does randomization do to this game?
 
 SUPERHOT's campaign is a linear chain of story levels navigated through an in-fiction
-"computer" hub. There's no branching, and (unlike MIND CONTROL DELETE) no persistent
-inventory between levels, so there isn't a natural "item" pool the way most AP worlds have
-one. `apworld/superhot/data/levels.json` lists 32 real levels extracted directly from the
-game's own data (two more, both dead "Cyberspace" intermission entries with no real level
-behind them, were removed after a playtest confirmed neither could ever get a hub button —
-see `NOTES.md`).
+"computer" hub — no branching, no persistent inventory between levels. Each level is
+shuffled behind its own `Level Access` item, so levels unlock out of order as items come
+in from other players, instead of the game's native strictly-sequential unlock. In-level
+secret consoles are also real, separately-checkable locations.
 
-Current design:
-- **Locations (58):** one `<level> Complete` for 31 of the 32 levels, plus one
+The goal is beating the final level, same as vanilla — no alternate goals yet.
+
+<details>
+<summary><h3 style="display: inline">What gets randomized</h3></summary>
+
+- **58 locations:** one `<level> Complete` for 31 of the 32 real levels, plus one
   `<level> Secret` for the 27 levels that have an in-level secret console. The 32nd level
-  (the game's real ending) deliberately has no completion location of its own — finishing
-  it ends the run, and a real, fillable check behind "beat the entire game" would be bad
-  multiworld design if another player's own progression depended on it. A dedicated
-  `Victory` event location (no real network id) signals completion instead.
-- **Items (58 real + 1 event):** one `Level Access` item per level (32 — the first
-  level's is "useful"-classified flavor rather than progression, since its location has no
-  access rule), padded with 26 `White Space` filler items to match the real location
-  count, plus the logic-only `Victory` event item.
-- Secret in-hub computer terminals are real locations, not just an idea — see above.
+  (the game's real ending) has no completion location of its own — a real, fillable check
+  behind "beat the entire game" would be bad multiworld design if another player's
+  progression depended on it. A `Victory` event signals completion instead.
+- **58 real items + 1 event:** one `Level Access` item per level (the first level's is
+  flavor rather than progression, since its location has no access rule), padded with
+  `White Space` filler items to match the location count, plus the logic-only `Victory`
+  event.
 
-It's a fully linear chain, so it's a simple but legitimate AP world (similar in spirit to
-other linear/no-branching games in the ecosystem) — every level receives exactly one
-shuffled unlock item, so other players' items can land in your world and vice versa, but
-there's no logic complexity beyond "you need item N to reach location N." The game's own
-hub UI doesn't natively support unlocking levels out of order, which the mod works around
-with its own unlock-tracking layer (see `ARCHITECTURE.md`).
+</details>
 
-## Status
+<details>
+<summary><h3 style="display: inline">What other changes are made to the game</h3></summary>
 
-- **`apworld/superhot/`** generates successfully — verified against a real clone of
-  `ArchipelagoMW/Archipelago` (`Generate.py` produces a valid `.zip` with a coherent
-  playthrough), re-checked after every subsequent change to the level list and id scheme.
-  A real unit test suite (`apworld/superhot/test/`) runs against the same checkout.
-- **`mod/SuperhotArchipelago/`** compiles against the actual `Assembly-CSharp.dll`,
-  `MelonLoader.dll`, `0Harmony.dll`, and has been run for real, repeatedly, against a
-  locally-hosted Archipelago server: connecting, sending checks, and receiving items all
-  work end to end. Real playtesting (not just a clean compile) found and fixed a long list
-  of real bugs along the way — level-skip softlocks on several different level-transition
-  paths, checks silently not sending for levels that end via a scripted transition instead
-  of the normal ending, and a hub-button click-blocking regression, among others — all
-  documented with root cause in `NOTES.md`.
 - **Connecting is done in-game**, not by hand-editing a config file: an `ARCHIPELAGO`
   icon on the hub's main screen (alongside `LEVELS`/`ENDLESS`) opens a real, native-styled
   screen for entering your server/slot/password, with live connection status shown right
-  on the icon. Editing `MelonPreferences.cfg` directly still works too, for
-  scripting/automation — see `TESTING.md`.
+  on the icon.
+- The hub's native lock logic only supports two states (sequential-up-to-highest-finished,
+  or everything unlocked) — a layer on top tracks Archipelago's own out-of-order unlocks
+  without replacing that native logic.
+- Level buttons and their secret-console badges reflect what Archipelago has actually
+  checked this run, not leftover native save data from a previous playthrough.
+
+</details>
+
+## Setting it up
+
+<details>
+<summary><h3 style="display: inline">Install steps</h3></summary>
+
+1. Install [MelonLoader](https://melonwiki.xyz) into your SUPERHOT install.
+2. Grab the latest mod release and drop the `Mods` and `UserLibs` folders it contains into
+   your SUPERHOT folder (same level as `SUPERHOT.exe`).
+3. Install `superhot.apworld` into Archipelago via the Launcher's **Install APWorld**
+   button, generate/host a game as usual.
+4. Launch SUPERHOT, select the `ARCHIPELAGO` icon on the hub's main screen, and enter your
+   server/slot/password — `Tab`/`Enter` move between fields, `Enter` on the last field
+   connects, `Esc` closes the screen. Settings are saved automatically.
+
+Full details, including troubleshooting, are in [TESTING.md](TESTING.md).
+
+</details>
+
+## Status & known limitations
+
+<details>
+<summary><h3 style="display: inline">Status</h3></summary>
+
+- The apworld generates successfully against a real Archipelago checkout, with a real
+  unit test suite (`apworld/superhot/test/`) that runs against it.
+- The mod has been run for real, repeatedly, against a locally-hosted server: connecting,
+  sending checks, and receiving items all work end to end. Real playtesting found and
+  fixed a long list of real bugs along the way — see [NOTES.md](NOTES.md) for the dated
+  log of every one, with root cause.
 - **Still beta.** Testing so far has been solo, on one Windows machine, one game install.
-  There's no confirmed run yet with a second real player connected to the same multiworld
-  room. If something breaks for you, see `TESTING.md`'s troubleshooting section for what
-  to send along.
+  There's no confirmed run yet with a second real player in the same multiworld room.
+
+</details>
+
+<details>
+<summary><h3 style="display: inline">Known limitations</h3></summary>
+
 - `apworld/superhot/Items.py`'s `BASE_ID` is an unreserved placeholder, not a range
-  assigned by the Archipelago maintainers — fine for running this as a standalone/custom
-  world, but worth knowing if you're also running other unofficial, unlisted worlds in the
-  same multiworld seed.
+  assigned by the Archipelago maintainers — fine standalone, worth knowing if you're also
+  running other unofficial worlds in the same seed.
+- Challenge mode and Endless mode aren't tracked by Archipelago at all yet.
+- No alternate goals besides the vanilla ending.
+
+</details>
+
+## Bug Reports & Feature Requests
+
+Found a bug, or something feel off? Please open an
+[issue](<your-repo-url>/issues) *(update once the repo is up)* — see `NOTES.md`'s
+troubleshooting note in `TESTING.md` for what's most useful to include.
+
+## Contributing / how this is built
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a full file-by-file breakdown of both the
+apworld and the mod, and [NOTES.md](NOTES.md) for the complete history of what's been
+found and fixed.
+
+### Tools
+
+- [MelonLoader](https://melonwiki.xyz) & [Harmony](https://github.com/pardeike/Harmony) —
+  the mod's runtime and patching framework
+- [Archipelago.MultiClient.Net](https://github.com/ArchipelagoMW/Archipelago.MultiClient.Net) —
+  official C# client library
+- [ilspycmd](https://github.com/icsharpcode/ILSpy) — decompiling the real game assembly to
+  confirm every claim about SUPERHOT's internals against the actual shipped code, rather
+  than guessing
+
+### Credits
+
+- Michael — apworld & mod
