@@ -81,8 +81,11 @@ Full details, including troubleshooting, are in [TESTING.md](TESTING.md).
   sending checks, and receiving items all work end to end. Real playtesting found and
   fixed a long list of real bugs along the way — see [NOTES.md](NOTES.md) for the dated
   log of every one, with root cause.
-- **Still beta.** Testing so far has been solo, on one Windows machine, one game install.
-  There's no confirmed run yet with a second real player in the same multiworld room.
+- **Still beta**, but confirmed working with a second real player: a real 2-player
+  multiworld room (both players actually connected, sending checks, and receiving items
+  from each other) has been played end to end with no issues. Most testing has still been
+  on one Windows machine/one game install, so different setups (different game version,
+  different MelonLoader version, more than 2 players) are still less-traveled territory.
 
 </details>
 

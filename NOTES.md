@@ -1502,6 +1502,19 @@ was purely a documentation/understanding correction. `NOTES.md`'s own Round 10 e
 accurately records what was actually done at the time -- this entry is the correction,
 not a rewrite of history.
 
+## Round 19: first real 2-player multiworld confirmed
+
+Real milestone, reported directly: "I did testing with a friend in a multiworld and it
+worked perfectly." This is the first confirmed run with a second real player actually
+connected to the same room -- previously an explicitly flagged gap (every earlier round's
+"still beta" caveat called out solo-only testing). No bugs reported from this session, so
+nothing to fix here -- just closing out a real, previously-open unknown. Updated the
+"still beta" caveat in `README.md` and `TESTING.md` to reflect this instead of continuing
+to claim it was untested with a second player, since that stopped being true.
+
+Still open: more than 2 players, and setups other than Windows/this exact game+MelonLoader
+version, remain untested.
+
 ## Design decisions still open
 
 - Should challenge-mode / endless-mode unlocks be locations in v1, or a stretch goal?

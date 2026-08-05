@@ -110,9 +110,10 @@ has been playtested for real, repeatedly (see `NOTES.md`) — it's not a guess.
 Send me whatever the MelonLoader console printed (especially any red/error lines) and
 which step you got to — that tells me whether it's a Harmony patch not firing, a wrong
 field name I got wrong despite the decompile, or something more basic like a missing
-dependency. This project has been tested solo, on one Windows machine, one game install —
-if you're on a different setup (different game version, different MelonLoader version, a
-second real player in the same room), you're in genuinely new territory, and that's
-exactly the kind of report that's most useful. `NOTES.md` has the full history of what's
+dependency. This project has been confirmed working with a real 2-player multiworld room,
+but most testing has still been on one Windows machine, one game install — if you're on a
+different setup (different game version, different MelonLoader version, more than 2
+players), you're in genuinely new territory, and that's exactly the kind of report that's
+most useful. `NOTES.md` has the full history of what's
 already been found and fixed, and its "Design decisions still open" section lists what's
 still known-incomplete (e.g. challenge/endless mode isn't tracked by Archipelago at all).
