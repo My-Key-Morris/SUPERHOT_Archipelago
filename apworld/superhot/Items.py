@@ -17,8 +17,14 @@ from typing import NamedTuple, Optional
 
 from BaseClasses import Item, ItemClassification
 
-# NOTE: this base_id is a placeholder. A real submission to the Archipelago project needs
-# a reserved, collision-free id range assigned by the maintainers.
+# Just an arbitrary starting point, not a maintainer-assigned range -- confirmed against
+# Archipelago's own docs (docs/world api.md's Locations/Items sections) that item/location
+# ids only need to be unique *within this world's own tables*, not globally across every
+# game in a multiworld; other games' worlds can and do reuse the same raw numbers with zero
+# conflict, since the server always resolves an id by (game, id), never by id alone. This
+# used to be a real, global-uniqueness requirement in older Archipelago versions, which is
+# why offsetting from a large arbitrary base is still such a common pattern across worlds --
+# it's harmless legacy convention here, not something correctness depends on.
 BASE_ID = 3891000
 
 # Items and locations are separate id namespaces in Archipelago -- a location and an item

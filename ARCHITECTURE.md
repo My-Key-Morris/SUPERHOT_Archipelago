@@ -43,9 +43,10 @@ module-level tables to build a multiworld.
 
 ### The id scheme
 
-Every location and item needs a globally unique integer id. This world reserves a block
-starting at `BASE_ID = 3891000` (a placeholder — a real upstream submission would need a
-maintainer-assigned range) and slices it up by adding fixed offsets:
+Every location and item needs an integer id that's unique within this world's own tables
+— confirmed against Archipelago's own docs that this scope is per-game, not global, so it
+can freely overlap with other games' ids without conflict. This world picks an arbitrary
+block starting at `BASE_ID = 3891000` and slices it up by adding fixed offsets:
 
 - **Level-complete locations:** `BASE_ID + order` (e.g. level 5 → `3891005`).
 - **Secret locations:** `BASE_ID + 20000 + order` (`SECRET_LOCATION_OFFSET`, kept well

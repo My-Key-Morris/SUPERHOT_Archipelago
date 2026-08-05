@@ -1467,6 +1467,41 @@ apworld), fixing everything found rather than just listing it:
 - Clean rebuild of the mod from scratch (`rm -rf bin obj`, full `dotnet build`) still
   succeeds with 0 errors.
 
+## Round 18: BASE_ID's "unreserved placeholder" caveat was based on a wrong assumption
+
+Real correction, sourced from an apworld-dev Discord conversation the user read and
+brought back rather than something found independently: item/location ids in Archipelago
+do **not** need to be globally unique across every game in a multiworld. That used to be
+true in older Archipelago versions (per the Discord thread: "Ids used to be global, so
+you had to offset"), but isn't anymore -- "a lot of worlds have no reason to undo that
+effort so it's still there," which is exactly the situation this project was already in.
+
+Confirmed directly against Archipelago's own current docs rather than taking the Discord
+conversation at face value: `docs/world api.md`'s Locations section states "The ID needs
+to be unique across all locations within the game. Locations and items can share IDs, and
+locations can share IDs with other games' locations" -- and the Items section says the
+same for items. So the scope was always meant to be per-game, not global, and the
+server resolves a check by (game, id), never by id alone.
+
+This directly contradicts what Round 10 wrote into the README (the note that `BASE_ID` is
+an "unreserved placeholder" worth caution around if paired with other unofficial worlds)
+and what I told the user in this same conversation before checking. That framing was
+wrong, not just imprecise -- there was never a collision risk to begin with, official or
+unofficial worlds. Fixed everywhere that claim appeared:
+
+- `README.md`'s "Known limitations" bullet about `BASE_ID` -- removed, since it no longer
+  describes a real limitation.
+- `apworld/superhot/Items.py`'s comment above `BASE_ID` -- rewritten to explain it's an
+  arbitrary internal starting point, not something requiring maintainer coordination.
+- `ARCHITECTURE.md`'s "The id scheme" section -- "globally unique" corrected to "unique
+  within this world's own tables."
+
+No code changes -- `BASE_ID = 3891000` and all its offsets are unaffected either way, this
+was purely a documentation/understanding correction. `NOTES.md`'s own Round 10 entry
+(the one that originally added the now-corrected claim) is left as-is above, since it
+accurately records what was actually done at the time -- this entry is the correction,
+not a rewrite of history.
+
 ## Design decisions still open
 
 - Should challenge-mode / endless-mode unlocks be locations in v1, or a stretch goal?
