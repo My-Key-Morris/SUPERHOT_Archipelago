@@ -1,0 +1,21 @@
+# Local SUPERHOT game install, used only for local build/testing (SuperhotGameDir points
+# here) -- this is a full copy of the actual commercial game (SH.exe, SH_Data/ assets,
+# etc.), never something to commit or publish. Critical: must stay ignored even though it
+# sits at the project root alongside apworld/ and mod/.
+/SUPERHOT/
+
+# .NET build output (mod/SuperhotArchipelago/)
+bin/
+obj/
+*.user
+
+# Python bytecode cache (apworld/superhot/)
+__pycache__/
+*.pyc
+
+# Editor/OS cruft
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

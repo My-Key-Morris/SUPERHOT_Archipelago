@@ -1,0 +1,23 @@
+# SUPERHOT Archipelago player options.
+#
+# This is a minimal, ready-to-use sample -- apworld/superhot/Options.py doesn't define
+# any game-specific options yet (see its own docstring), so there's nothing to configure
+# beyond the two options every Archipelago world gets for free (progression_balancing,
+# accessibility). Copy this file, rename it, and change `name` if you want a second
+# player/slot for testing with more than one person in the same room.
+#
+# See https://archipelago.gg/tutorial/Archipelago/setup/en for the general format if you
+# want to add more players to the same YAML file, or check other games' options.
+
+name: Michael
+description: Sample player file for the SUPERHOT Archipelago world -- see TESTING.md.
+game: SUPERHOT
+
+requires:
+  version: 0.5.0
+
+SUPERHOT:
+  progression_balancing:
+    50: 50
+  accessibility:
+    full: true
