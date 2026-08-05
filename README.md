@@ -12,8 +12,6 @@ The original SUPERHOT (2016 — not MIND CONTROL DELETE) as a playable game slot
 - This apworld: [Releases Page](<your-repo-url>/releases/latest) *(update once the repo is up)*
 - [MelonLoader](https://melonwiki.xyz) — the mod loader the in-game half runs on
 
-**See [TESTING.md](TESTING.md) for the full first-time setup walkthrough.**
-
 ## What does randomization do to this game?
 
 SUPERHOT's campaign is a linear chain of story levels navigated through an in-fiction
@@ -54,19 +52,32 @@ The goal is beating the final level, same as vanilla — no alternate goals yet.
 
 ## Setting it up
 
-<details>
+<details open>
 <summary><h3 style="display: inline">Install steps</h3></summary>
 
-1. Install [MelonLoader](https://melonwiki.xyz) into your SUPERHOT install.
-2. Grab the latest mod release and drop the `Mods` and `UserLibs` folders it contains into
-   your SUPERHOT folder (same level as `SUPERHOT.exe`).
-3. Install `superhot.apworld` into Archipelago via the Launcher's **Install APWorld**
-   button, generate/host a game as usual.
-4. Launch SUPERHOT, select the `ARCHIPELAGO` icon on the hub's main screen, and enter your
-   server/slot/password — `Tab`/`Enter` move between fields, `Enter` on the last field
-   connects, `Esc` closes the screen. Settings are saved automatically.
+1. Install the official [Archipelago app](https://github.com/ArchipelagoMW/Archipelago/releases/latest)
+   (the real multiworld generator/server/client — this is what actually creates and hosts
+   a game).
+2. Open the Archipelago Launcher, click **Install APWorld**, and pick `superhot.apworld`
+   from this project's releases. SUPERHOT should now show up as a supported game.
+3. Install [MelonLoader](https://melonwiki.xyz) into your SUPERHOT install (same folder as
+   `SUPERHOT.exe`). Launch and close SUPERHOT once to finalize the MelonLoader install.
+4. Grab the latest mod release from this project and drop the `Mods` and `UserLibs`
+   folders it contains into your SUPERHOT folder, alongside `SUPERHOT.exe`.
+5. Generate and host a game as usual through the Archipelago Launcher (**Generate**, then
+   **Host** on the resulting `.zip`) — or use an already-hosted room if you're joining
+   someone else's.
+6. Launch SUPERHOT. MelonLoader prints console output on top of the game — look for lines
+   starting with `[SuperhotArchipelago]` confirming it loaded.
+7. On the hub's main screen (alongside `LEVELS`/`ENDLESS`), select the `ARCHIPELAGO` icon
+   and enter your server/slot/password — `Tab`/`Enter` move between fields, `Enter` on the
+   last field connects, `Esc` closes the screen. Settings are saved automatically, so you
+   won't need to re-enter them next launch.
+8. Play the first level. Watch the MelonLoader console for a line confirming a check was
+   sent — that's the sign everything's actually wired up correctly.
 
-Full details, including troubleshooting, are in [TESTING.md](TESTING.md).
+**If something breaks:** open an issue with whatever the MelonLoader console printed
+(especially red/error lines) and which step you got to.
 
 </details>
 
@@ -79,8 +90,8 @@ Full details, including troubleshooting, are in [TESTING.md](TESTING.md).
   unit test suite (`apworld/superhot/test/`) that runs against it.
 - The mod has been run for real, repeatedly, against a locally-hosted server: connecting,
   sending checks, and receiving items all work end to end. Real playtesting found and
-  fixed a long list of real bugs along the way — see [NOTES.md](NOTES.md) for the dated
-  log of every one, with root cause.
+  fixed a long list of real bugs along the way, from level-skip softlocks to hub display
+  issues — all since fixed.
 - **Still beta**, but confirmed working with a second real player: a real 2-player
   multiworld room (both players actually connected, sending checks, and receiving items
   from each other) has been played end to end with no issues. Most testing has still been
@@ -100,14 +111,16 @@ Full details, including troubleshooting, are in [TESTING.md](TESTING.md).
 ## Bug Reports & Feature Requests
 
 Found a bug, or something feel off? Please open an
-[issue](<your-repo-url>/issues) *(update once the repo is up)* — see `NOTES.md`'s
-troubleshooting note in `TESTING.md` for what's most useful to include.
+[issue](<your-repo-url>/issues) *(update once the repo is up)* with whatever the
+MelonLoader console printed (especially red/error lines) and which step you got to —
+that's the fastest way to track down whether it's a patch not firing, a version mismatch,
+or something more basic.
 
-## Contributing / how this is built
+## Contributing
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for a full file-by-file breakdown of both the
-apworld and the mod, and [NOTES.md](NOTES.md) for the complete history of what's been
-found and fixed.
+Pull requests welcome. `apworld/superhot/` is a standard Archipelago world (Python);
+`mod/SuperhotArchipelago/` is a MelonLoader/Harmony mod (C#, `net472`) that builds against
+a real local SUPERHOT install.
 
 ### Tools
 

@@ -19,3 +19,9 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Internal working notes -- kept locally for our own reference, deliberately not part of
+# the public repo. TESTING.md's user-facing content now lives inline in README.md instead.
+/TESTING.md
+/ARCHITECTURE.md
+/NOTES.md
