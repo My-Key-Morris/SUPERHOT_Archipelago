@@ -3,8 +3,6 @@
 The original SUPERHOT (2016 — not MIND CONTROL DELETE) as a playable game slot in
 [Archipelago](https://archipelago.gg), the multi-game randomizer.
 
-⚠ *Solo-tested on Windows, one machine, one game install. Still beta — see [Status](#status--known-limitations) below.* ⚠
-
 ## Required Software
 
 - SUPERHOT: [Steam Store](https://store.steampowered.com/app/322500)
@@ -134,4 +132,4 @@ a real local SUPERHOT install.
 
 ### Credits
 
-- Michael — apworld & mod
+- Miikurb — apworld & mod
