@@ -8,7 +8,7 @@ The original SUPERHOT (2016 — not MIND CONTROL DELETE) as a playable game slot
 - SUPERHOT: [Steam Store](https://store.steampowered.com/app/322500)
 - Archipelago: [Releases Page](https://github.com/ArchipelagoMW/Archipelago/releases/latest)
 - This apworld: [GitHub Releases Page](https://github.com/My-Key-Morris/SUPERHOT_Archipelago/releases/latest)
-- The mod: [Nexus Mods](<your-nexus-url>) *(update once the page is up)*
+- The mod: [Nexus Mods](https://www.nexusmods.com/superhot/mods/7)
 - [MelonLoader](https://melonwiki.xyz) — the mod loader the in-game half runs on
 
 ## What does randomization do to this game?
@@ -72,7 +72,7 @@ The goal is beating the final level, same as vanilla.
    SUPERHOT should now show up as a supported game.
 3. Install [MelonLoader](https://melonwiki.xyz) into your SUPERHOT install (same folder as
    `SUPERHOT.exe`). Launch and close SUPERHOT once to finalize the MelonLoader install.
-4. Grab the mod from [Nexus Mods](<your-nexus-url>) and drop the `Mods` and `UserLibs`
+4. Grab the mod from [Nexus Mods](https://www.nexusmods.com/superhot/mods/7) and drop the `Mods` and `UserLibs`
    folders it contains into your SUPERHOT folder, alongside `SUPERHOT.exe`.
 5. Generate and host a game as usual through the Archipelago Launcher (**Generate**, then
    **Host** on the resulting `.zip`) — or use an already-hosted room if you're joining
