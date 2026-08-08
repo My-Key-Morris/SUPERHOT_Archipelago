@@ -7,7 +7,7 @@ The original SUPERHOT (2016 — not MIND CONTROL DELETE) as a playable game slot
 
 - SUPERHOT: [Steam Store](https://store.steampowered.com/app/322500)
 - Archipelago: [Releases Page](https://github.com/ArchipelagoMW/Archipelago/releases/latest)
-- This apworld: [Releases Page](<your-repo-url>/releases/latest) *(update once the repo is up)*
+- This apworld: [Releases Page](https://github.com/My-Key-Morris/SUPERHOT_Archipelago/releases/latest)
 - [MelonLoader](https://melonwiki.xyz) — the mod loader the in-game half runs on
 
 ## What does randomization do to this game?
@@ -119,7 +119,7 @@ The goal is beating the final level, same as vanilla — no alternate goals yet.
 ## Bug Reports & Feature Requests
 
 Found a bug, or something feel off? Please open an
-[issue](<your-repo-url>/issues) *(update once the repo is up)* with whatever the
+[issue](https://github.com/My-Key-Morris/SUPERHOT_Archipelago/issues) with whatever the
 MelonLoader console printed (especially red/error lines) and which step you got to —
 that's the fastest way to track down whether it's a patch not firing, a version mismatch,
 or something more basic.
