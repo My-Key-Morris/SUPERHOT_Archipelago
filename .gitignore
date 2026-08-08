@@ -26,3 +26,9 @@ Thumbs.db
 /ARCHITECTURE.md
 /NOTES.md
 /MOD_GUIDE.md
+
+# Packaged mod release zips -- these are Nexus upload artifacts (Mods/ + UserLibs/,
+# built from mod/SuperhotArchipelago's own build output), not source, and don't belong
+# in git history. The apworld's built copy is still tracked at dist/superhot.apworld
+# since that one *is* meant to live in a GitHub release built from this repo.
+/SuperhotArchipelago_v*.zip
