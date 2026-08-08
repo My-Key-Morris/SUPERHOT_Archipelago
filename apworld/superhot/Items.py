@@ -57,22 +57,21 @@ def level_item_name(level: dict) -> str:
     return f"Level Access: {level['name']}"
 
 
-def _level_classification(level: dict) -> ItemClassification:
-    # Level 1 is always reachable (see Rules.py -- its location has no access rule), so
-    # its item doesn't gate anything. It still needs to exist and occupy a slot in the
-    # pool (one real item per real location, see __init__.py create_items), just not as
-    # a progression item -- "useful" flavor fits better than plain filler since it's
-    # still thematically a level-unlock, even a redundant one.
-    if level["order"] == 1:
-        return ItemClassification.useful
-    return ItemClassification.progression
-
-
+# Real, explicit user request: level 1 ("01 - Kick") is always reachable with no items
+# (see Rules.py -- its location has no access rule), so a "Level Access: 01 - Kick" item
+# would do nothing when received -- UnlockState.Unlock() on a level LevelAccessGuard
+# already always lets through regardless. Used to still exist anyway, classified
+# "useful" rather than "progression", purely to keep one named item per level; changed
+# to not exist at all -- its location's slot in the pool is filled by one more White
+# Space filler instead (see __init__.py's create_items) -- so nothing shows up in a
+# receive log that turns out to be a no-op. Every level from here on (LEVELS[1:]) is a
+# real progression item; level 1's entry is deliberately absent from item_table.
 item_table: dict[str, ItemData] = {
     level_item_name(level): ItemData(
-        BASE_ID + ITEM_ID_OFFSET + level["order"], _level_classification(level)
+        BASE_ID + ITEM_ID_OFFSET + level["order"], ItemClassification.progression
     )
     for level in LEVELS
+    if level["order"] != 1
 }
 
 # Event item signalling the game has been beaten (final level completed).

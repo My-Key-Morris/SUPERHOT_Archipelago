@@ -62,11 +62,17 @@ class SuperhotWorld(World):
         return SuperhotItem(name, classification, code, self.player)
 
     def create_items(self) -> None:
-        # One item per level (level 1's item is "useful" flavor rather than progression,
-        # see Items.py, since its location has no access rule). The separate Victory
-        # event location created in Regions.py holds the locked Victory item and isn't
-        # part of this regular pool/fill count.
+        # One item per level, except level 1 ("01 - Kick") -- its location has no access
+        # rule (always reachable), so a "Level Access: 01 - Kick" item would be a no-op
+        # if received. Real, explicit user request: rather than still create one anyway
+        # (the old behavior -- see git history/NOTES.md), level 1 is skipped here and its
+        # location's pool slot is covered by the filler padding below instead, one White
+        # Space item larger than before. The separate Victory event location created in
+        # Regions.py holds the locked Victory item and isn't part of this regular
+        # pool/fill count.
         for level in LEVELS:
+            if level["order"] == 1:
+                continue
             self.multiworld.itempool.append(self.create_item(level_item_name(level)))
 
         # Real bug found by a direct question about how this world handles filler,
@@ -82,8 +88,10 @@ class SuperhotWorld(World):
         # world is expected to pad its own pool in create_items() -- this was silently
         # missing here since the location count changed but this loop was never revisited
         # to match. Fixed by explicitly filling the remainder with create_filler() calls
-        # (see get_filler_item_name below for what that actually returns).
-        filler_needed = len(location_table) - len(LEVELS)
+        # (see get_filler_item_name below for what that actually returns). The "- 1" here
+        # accounts for level 1's skipped item above -- one more filler needed than levels
+        # actually get their own item now.
+        filler_needed = len(location_table) - (len(LEVELS) - 1)
         for _ in range(filler_needed):
             self.multiworld.itempool.append(self.create_filler())
 

@@ -18,9 +18,10 @@ from .bases import SuperhotTestBase
 
 class TestLevelAccess(SuperhotTestBase):
     def test_first_level_needs_no_item(self) -> None:
-        """Level 1 has no access rule at all (see Items.py's _level_classification) and
-        should always be reachable with nothing collected -- including its secret, which
-        follows the same no-rule exception (see Rules.py)."""
+        """Level 1 has no access rule at all (see Rules.py) and should always be reachable
+        with nothing collected -- including its secret, which follows the same no-rule
+        exception. It also has no item of its own at all (see Items.py's item_table,
+        which excludes level 1 entirely)."""
         first_level = LEVELS[0]
         first_location = level_location_name(first_level)
         self.assertTrue(

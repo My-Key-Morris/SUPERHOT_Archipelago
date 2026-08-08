@@ -27,10 +27,10 @@ The goal is beating the final level, same as vanilla.
 - **58 locations:** one `<level> Complete` for 31 of the 32 real levels, plus one
   `<level> Secret` for the 27 levels that have an in-level secret console. The 32nd level
   (the game's real ending) has no completion location of its own.
-- **58 real items + 1 event:** one `Level Access` item per level (the first level's is
-  flavor rather than progression, since its location has no access rule), padded with
-  `White Space` filler items to match the location count, plus the logic-only `Victory`
-  event.
+- **58 real items + 1 event:** one `Level Access` item for every level except the first
+  (its location has no access rule, so it's always open — an item for it would do
+  nothing), padded with `White Space` filler items to match the location count, plus the
+  logic-only `Victory` event.
 
 </details>
 
