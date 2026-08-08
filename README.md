@@ -18,7 +18,7 @@ shuffled behind its own `Level Access` item, so levels unlock out of order as it
 in from other players, instead of the game's native strictly-sequential unlock. In-level
 secret consoles are also real, separately-checkable locations.
 
-The goal is beating the final level, same as vanilla — no alternate goals yet.
+The goal is beating the final level, same as vanilla.
 
 <details>
 <summary><h3 style="display: inline">What gets randomized</h3></summary>
@@ -89,33 +89,6 @@ The goal is beating the final level, same as vanilla — no alternate goals yet.
 
 </details>
 
-## Status & known limitations
-
-<details>
-<summary><h3 style="display: inline">Status</h3></summary>
-
-- The apworld generates successfully against a real Archipelago checkout, with a real
-  unit test suite (`apworld/superhot/test/`) that runs against it.
-- The mod has been run for real, repeatedly, against a locally-hosted server: connecting,
-  sending checks, and receiving items all work end to end. Real playtesting found and
-  fixed a long list of real bugs along the way, from level-skip softlocks to hub display
-  issues — all since fixed.
-- **Still beta**, but confirmed working with a second real player: a real 2-player
-  multiworld room (both players actually connected, sending checks, and receiving items
-  from each other) has been played end to end with no issues. Most testing has still been
-  on one Windows machine/one game install, so different setups (different game version,
-  different MelonLoader version, more than 2 players) are still less-traveled territory.
-
-</details>
-
-<details>
-<summary><h3 style="display: inline">Known limitations</h3></summary>
-
-- Challenge mode and Endless mode aren't tracked by Archipelago at all yet.
-- No alternate goals besides the vanilla ending.
-
-</details>
-
 ## Bug Reports & Feature Requests
 
 Found a bug, or something feel off? Please open an
@@ -126,19 +99,13 @@ or something more basic.
 
 ## Contributing
 
-Pull requests welcome. `apworld/superhot/` is a standard Archipelago world (Python);
-`mod/SuperhotArchipelago/` is a MelonLoader/Harmony mod (C#, `net472`) that builds against
-a real local SUPERHOT install.
-
 ### Tools
 
 - [MelonLoader](https://melonwiki.xyz) & [Harmony](https://github.com/pardeike/Harmony) —
   the mod's runtime and patching framework
 - [Archipelago.MultiClient.Net](https://github.com/ArchipelagoMW/Archipelago.MultiClient.Net) —
   official C# client library
-- [ilspycmd](https://github.com/icsharpcode/ILSpy) — decompiling the real game assembly to
-  confirm every claim about SUPERHOT's internals against the actual shipped code, rather
-  than guessing
+- [ilspycmd](https://github.com/icsharpcode/ILSpy) — decompiling the real game assembly
 
 ### Credits
 
