@@ -61,16 +61,20 @@ namespace SuperhotArchipelago.Patches
     ///   from LocationManager.IsLevelCompleted(), which reads the live Archipelago session
     ///   rather than anything tracked locally -- see its own comment for why.
     ///
-    /// A fourth state exists for exactly one button, "34 - Free": item-unlocked but still
-    /// short of the other-levels-completed threshold (Core/LevelAccessGuard.cs's second
-    /// gate on it). Shown grey like "unlocked, not completed" above, but with a live
-    /// "done/needed" count in place of the usual "LEVEL" status, and genuinely locked
-    /// (IsLocked = true) rather than just colored -- unlike the general unlocked/not-yet-
-    /// completed case, a never-yet-played level, this one really can't be entered yet.
-    /// The same count is also pushed into the button's right-panel description text
-    /// (SHGUIcommanderbutton.data), so it shows up as a legible line in the hub's preview
-    /// panel when this row is highlighted -- the same treatment the "secret cracked/not
-    /// cracked" line gets for levels that have a secret, confirmed via decompile.
+    /// A fourth state exists for exactly one button, "34 - Free": still short of the
+    /// other-levels-completed threshold (Core/LevelAccessGuard.cs's second gate on it).
+    /// Unlike the other three states, this one is checked independently of
+    /// unlocked/not-unlocked and applies on both sides of it -- confirmed by a real user
+    /// report that only showing it after the access item was already received made it
+    /// look broken, since most of a run happens before that item ever arrives. While
+    /// still gated: the status suffix reads a live "done/needed" count instead of
+    /// "LOCKED"/"LEVEL" (garbled name + progress suffix if the item isn't held yet,
+    /// clean name + progress suffix and genuinely locked -- IsLocked = true, unlike the
+    /// general unlocked/not-yet-completed case -- once it is), and the same count is
+    /// pushed into the button's right-panel description text (SHGUIcommanderbutton.data),
+    /// so it shows up as a legible line in the hub's preview panel when this row is
+    /// highlighted -- the same treatment the "secret cracked/not cracked" line gets for
+    /// levels that have a secret, confirmed via decompile.
     /// </summary>
     [HarmonyPatch(typeof(piOsMenu), nameof(piOsMenu.LockUnfinishedLevels))]
     public static class HubUnlockPatch
@@ -167,6 +171,53 @@ namespace SuperhotArchipelago.Patches
                     }
                 }
 
+                // Real, explicit user request: "34 - Free" gets a second gate on top of
+                // the normal item-unlock below -- even once its own access item is
+                // received, it stays locked until enough of the other 31 levels are
+                // actually completed. This has to stay in sync with the real gate in
+                // Core/LevelAccessGuard.cs, which is what actually blocks entry -- this
+                // is only the display half. Computed here, before the unlocked check
+                // below, and NOT conditioned on unlocked -- a real user report showed
+                // this only appearing once the item was already in hand looked like it
+                // wasn't working at all, since most of a run happens before that. Runs
+                // unconditionally instead, same reasoning as the secret-crack block
+                // above: the progress is worth showing the whole time, so the one row
+                // in the whole locked list that isn't a plain "-LOCKED-"/noise is a
+                // (deliberately subtle) hint of which garbled row is actually Free.
+                bool isFreeLevel = entry.Order == SuperhotArchipelago.Core.LevelCatalog.Levels.Count;
+                int freeRequired = 0;
+                int freeCompleted = 0;
+                bool freeStillGated = false;
+                if (isFreeLevel)
+                {
+                    freeRequired = SuperhotArchipelago.Core.Mod.Connection?.LevelsRequiredForFree ?? 0;
+                    freeCompleted = SuperhotArchipelago.Core.Mod.Locations?.CountOtherLevelsCompleted() ?? 0;
+                    freeStillGated = freeCompleted < freeRequired;
+
+                    // Also push it into the right-side description/preview panel, the
+                    // same way piOsMenu.PrepareLevelDescription() shows "secret
+                    // cracked"/"not cracked" for levels that have one -- confirmed via
+                    // decompile that SHGUIcommanderbutton.data is exactly what gets
+                    // pushed into that panel (listLink.rightPanel.text) the moment this
+                    // row is highlighted. Rebuilt from LevelButtonCapturePatch's cached,
+                    // pre-scramble original every pass -- never mutated in place -- so
+                    // repeated hub refreshes can't double-insert the line, and it
+                    // cleanly reverts to the original (mostly noise, same as every other
+                    // level) once the gate opens.
+                    if (SuperhotArchipelago.Core.ButtonTextCache.TryGetData(levelInfo.ID, out string cleanData))
+                    {
+                        button.data = freeStillGated
+                            ? $"\n\n{freeCompleted}/{freeRequired} LEVELS COMPLETED\n\n" + cleanData
+                            : cleanData;
+                    }
+                }
+
+                // Padded to 8 chars to match the fixed-width status field every other
+                // status string here uses (MENU_LOCKED8CHARS/MENU_LEVEL8CHARS are both
+                // baked to that width) -- keeps the '│' column aligned with every other
+                // hub button instead of just this one shifting.
+                string? freeStatusSuffix = freeStillGated ? $"{freeCompleted}/{freeRequired}".PadRight(8) : null;
+
                 bool unlocked = entry.Order == 1 || SuperhotArchipelago.Core.UnlockState.IsUnlocked(levelInfo.ID);
 
                 if (!SuperhotArchipelago.Core.ButtonTextCache.TryGet(levelInfo.ID, out string cleanName))
@@ -182,7 +233,7 @@ namespace SuperhotArchipelago.Patches
                 {
                     string scrambled = StringScrambler.GetScrambledString(
                         cleanName.ToUpper(), 0.9f, "▀▄█▌▐░▒▓■▪01 ");
-                    button.ButtonText = scrambled + "│" + "MENU_LOCKED8CHARS".T();
+                    button.ButtonText = scrambled + "│" + (freeStatusSuffix ?? "MENU_LOCKED8CHARS".T());
                     button.RefreshText();
                     button.SetLocked(true);
                     continue;
@@ -190,49 +241,14 @@ namespace SuperhotArchipelago.Patches
 
                 bool completed = SuperhotArchipelago.Core.Mod.Locations?.IsLevelCompleted(levelInfo.ID) ?? false;
 
-                // Real, explicit user request: "34 - Free" gets a second gate on top of
-                // the normal item-unlock above -- even with its access item in hand, it
-                // stays locked (and shows live "done/needed" progress instead of the
-                // generic "LEVEL" status) until enough of the other 31 levels are
-                // actually completed. This has to stay in sync with the real gate in
-                // Core/LevelAccessGuard.cs, which is what actually blocks entry -- this
-                // is only the display half.
-                if (entry.Order == SuperhotArchipelago.Core.LevelCatalog.Levels.Count)
+                if (isFreeLevel && freeStillGated)
                 {
-                    int required = SuperhotArchipelago.Core.Mod.Connection?.LevelsRequiredForFree ?? 0;
-                    int otherCompleted = SuperhotArchipelago.Core.Mod.Locations?.CountOtherLevelsCompleted() ?? 0;
-                    bool stillGated = otherCompleted < required;
-
-                    // Real, explicit user request: also show this in the right-side
-                    // description/preview panel, the same way piOsMenu.PrepareLevelDescription()
-                    // shows "secret cracked"/"not cracked" for levels that have one --
-                    // confirmed via decompile that SHGUIcommanderbutton.data is exactly
-                    // what gets pushed into that panel (listLink.rightPanel.text) the
-                    // moment this row is highlighted. Rebuilt from
-                    // LevelButtonCapturePatch's cached, pre-scramble original every pass
-                    // -- never mutated in place -- so repeated hub refreshes can't
-                    // double-insert the line, and it cleanly reverts to the original
-                    // (mostly noise, same as every other level) once the gate opens.
-                    if (SuperhotArchipelago.Core.ButtonTextCache.TryGetData(levelInfo.ID, out string cleanData))
-                    {
-                        button.data = stillGated
-                            ? $"\n\n{otherCompleted}/{required} LEVELS COMPLETED\n\n" + cleanData
-                            : cleanData;
-                    }
-
-                    if (stillGated)
-                    {
-                        // Padded to 8 chars to match the fixed-width status field every
-                        // other status string here uses (MENU_LOCKED8CHARS/MENU_LEVEL8CHARS
-                        // are both baked to that width) -- keeps the '│' column aligned
-                        // with every other hub button instead of just this one shifting.
-                        button.ButtonText = cleanName + "│" + $"{otherCompleted}/{required}".PadRight(8);
-                        button.RefreshText();
-                        button.IsLocked = true;
-                        button.color = 'z';
-                        button.SetColorRecursive('z');
-                        continue;
-                    }
+                    button.ButtonText = cleanName + "│" + freeStatusSuffix;
+                    button.RefreshText();
+                    button.IsLocked = true;
+                    button.color = 'z';
+                    button.SetColorRecursive('z');
+                    continue;
                 }
 
                 button.ButtonText = cleanName + "│" + "MENU_LEVEL8CHARS".T();
