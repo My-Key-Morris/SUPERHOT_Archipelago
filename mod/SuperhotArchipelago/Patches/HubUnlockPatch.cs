@@ -67,6 +67,10 @@ namespace SuperhotArchipelago.Patches
     /// "done/needed" count in place of the usual "LEVEL" status, and genuinely locked
     /// (IsLocked = true) rather than just colored -- unlike the general unlocked/not-yet-
     /// completed case, a never-yet-played level, this one really can't be entered yet.
+    /// The same count is also pushed into the button's right-panel description text
+    /// (SHGUIcommanderbutton.data), so it shows up as a legible line in the hub's preview
+    /// panel when this row is highlighted -- the same treatment the "secret cracked/not
+    /// cracked" line gets for levels that have a secret, confirmed via decompile.
     /// </summary>
     [HarmonyPatch(typeof(piOsMenu), nameof(piOsMenu.LockUnfinishedLevels))]
     public static class HubUnlockPatch
@@ -197,8 +201,26 @@ namespace SuperhotArchipelago.Patches
                 {
                     int required = SuperhotArchipelago.Core.Mod.Connection?.LevelsRequiredForFree ?? 0;
                     int otherCompleted = SuperhotArchipelago.Core.Mod.Locations?.CountOtherLevelsCompleted() ?? 0;
+                    bool stillGated = otherCompleted < required;
 
-                    if (otherCompleted < required)
+                    // Real, explicit user request: also show this in the right-side
+                    // description/preview panel, the same way piOsMenu.PrepareLevelDescription()
+                    // shows "secret cracked"/"not cracked" for levels that have one --
+                    // confirmed via decompile that SHGUIcommanderbutton.data is exactly
+                    // what gets pushed into that panel (listLink.rightPanel.text) the
+                    // moment this row is highlighted. Rebuilt from
+                    // LevelButtonCapturePatch's cached, pre-scramble original every pass
+                    // -- never mutated in place -- so repeated hub refreshes can't
+                    // double-insert the line, and it cleanly reverts to the original
+                    // (mostly noise, same as every other level) once the gate opens.
+                    if (SuperhotArchipelago.Core.ButtonTextCache.TryGetData(levelInfo.ID, out string cleanData))
+                    {
+                        button.data = stillGated
+                            ? $"\n\n{otherCompleted}/{required} LEVELS COMPLETED\n\n" + cleanData
+                            : cleanData;
+                    }
+
+                    if (stillGated)
                     {
                         // Padded to 8 chars to match the fixed-width status field every
                         // other status string here uses (MENU_LOCKED8CHARS/MENU_LEVEL8CHARS

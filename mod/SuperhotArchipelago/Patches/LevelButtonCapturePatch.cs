@@ -44,6 +44,12 @@ namespace SuperhotArchipelago.Patches
             int separatorIndex = b.ButtonText.IndexOf('│');
             string cleanName = separatorIndex >= 0 ? b.ButtonText.Substring(0, separatorIndex) : b.ButtonText;
             ButtonTextCache.Remember(element.ID, cleanName);
+
+            // Also cache the button's right-panel description text (`b.data`, already
+            // built by piOsMenu.PrepareLevelDescription() at this point) before anything
+            // else can touch it -- see ButtonTextCache.cs's own comment for why
+            // HubUnlockPatch.cs needs a known-clean original to rebuild from.
+            ButtonTextCache.RememberData(element.ID, b.data);
         }
     }
 }

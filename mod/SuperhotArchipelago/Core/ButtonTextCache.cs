@@ -23,6 +23,17 @@ namespace SuperhotArchipelago.Core
         // time, not replayed from this snapshot. See HubUnlockPatch.cs.
         private static readonly Dictionary<int, string> _cleanNameByLevelId = new();
 
+        // Same idea, but for SHGUIcommanderbutton.data -- the (mostly scrambled-noise,
+        // by the native game's own design) text shown in the hub's right-side preview
+        // panel when a row is highlighted (confirmed via decompile:
+        // SHGUIcommanderbutton.Update() pushes `data` into `listLink.rightPanel.text`
+        // the moment a row becomes highlighted). Needed for the same reason as the name
+        // cache above: HubUnlockPatch.cs's Free-level progress display (see its own
+        // comment) has to rebuild `data` from a known-clean original every pass, not
+        // mutate whatever's currently there, or repeated hub refreshes would either
+        // double-insert the progress line or bake a stale one in permanently.
+        private static readonly Dictionary<int, string> _cleanDataByLevelId = new();
+
         public static void Remember(int levelId, string cleanName)
         {
             _cleanNameByLevelId[levelId] = cleanName;
@@ -31,6 +42,16 @@ namespace SuperhotArchipelago.Core
         public static bool TryGet(int levelId, out string cleanName)
         {
             return _cleanNameByLevelId.TryGetValue(levelId, out cleanName!);
+        }
+
+        public static void RememberData(int levelId, string cleanData)
+        {
+            _cleanDataByLevelId[levelId] = cleanData;
+        }
+
+        public static bool TryGetData(int levelId, out string cleanData)
+        {
+            return _cleanDataByLevelId.TryGetValue(levelId, out cleanData!);
         }
     }
 }

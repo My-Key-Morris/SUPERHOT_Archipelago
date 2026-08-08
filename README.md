@@ -48,9 +48,11 @@ The goal is beating the final level, same as vanilla — no alternate goals yet.
 - **`34 - Free`** (the real ending) has a second lock on top of the normal one: even
   once its own access item is received, it stays closed until enough of the other 31
   levels are actually completed, not just unlocked — so a lucky early item can't end
-  the run right away. Its hub button shows live progress (e.g. `12/25`) instead of the
-  usual status text while it's still short. How many levels are required is a YAML
-  option, `levels_required_for_free` (0–31, default 25, 0 disables it) — see
+  the run right away. While it's still short, its hub row shows live progress (e.g.
+  `12/25`) in place of the usual status text, and the same count shows up as a readable
+  line in the right-side preview panel when you scroll to it — the same way a
+  cracked/not-cracked secret shows up for other levels. How many levels are required is
+  a YAML option, `levels_required_for_free` (0–31, default 25, 0 disables it) — see
   `dist/superhot_michael.yaml` for where to set it.
 
 </details>
