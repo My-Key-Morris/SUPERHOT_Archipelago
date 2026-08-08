@@ -60,6 +60,13 @@ namespace SuperhotArchipelago.Patches
     /// - Unlocked, completed: same as above but with 'w' instead of 'z'. Completion comes
     ///   from LocationManager.IsLevelCompleted(), which reads the live Archipelago session
     ///   rather than anything tracked locally -- see its own comment for why.
+    ///
+    /// A fourth state exists for exactly one button, "34 - Free": item-unlocked but still
+    /// short of the other-levels-completed threshold (Core/LevelAccessGuard.cs's second
+    /// gate on it). Shown grey like "unlocked, not completed" above, but with a live
+    /// "done/needed" count in place of the usual "LEVEL" status, and genuinely locked
+    /// (IsLocked = true) rather than just colored -- unlike the general unlocked/not-yet-
+    /// completed case, a never-yet-played level, this one really can't be entered yet.
     /// </summary>
     [HarmonyPatch(typeof(piOsMenu), nameof(piOsMenu.LockUnfinishedLevels))]
     public static class HubUnlockPatch
@@ -178,6 +185,34 @@ namespace SuperhotArchipelago.Patches
                 }
 
                 bool completed = SuperhotArchipelago.Core.Mod.Locations?.IsLevelCompleted(levelInfo.ID) ?? false;
+
+                // Real, explicit user request: "34 - Free" gets a second gate on top of
+                // the normal item-unlock above -- even with its access item in hand, it
+                // stays locked (and shows live "done/needed" progress instead of the
+                // generic "LEVEL" status) until enough of the other 31 levels are
+                // actually completed. This has to stay in sync with the real gate in
+                // Core/LevelAccessGuard.cs, which is what actually blocks entry -- this
+                // is only the display half.
+                if (entry.Order == SuperhotArchipelago.Core.LevelCatalog.Levels.Count)
+                {
+                    int required = SuperhotArchipelago.Core.Mod.Connection?.LevelsRequiredForFree ?? 0;
+                    int otherCompleted = SuperhotArchipelago.Core.Mod.Locations?.CountOtherLevelsCompleted() ?? 0;
+
+                    if (otherCompleted < required)
+                    {
+                        // Padded to 8 chars to match the fixed-width status field every
+                        // other status string here uses (MENU_LOCKED8CHARS/MENU_LEVEL8CHARS
+                        // are both baked to that width) -- keeps the '│' column aligned
+                        // with every other hub button instead of just this one shifting.
+                        button.ButtonText = cleanName + "│" + $"{otherCompleted}/{required}".PadRight(8);
+                        button.RefreshText();
+                        button.IsLocked = true;
+                        button.color = 'z';
+                        button.SetColorRecursive('z');
+                        continue;
+                    }
+                }
+
                 button.ButtonText = cleanName + "│" + "MENU_LEVEL8CHARS".T();
                 button.RefreshText();
 

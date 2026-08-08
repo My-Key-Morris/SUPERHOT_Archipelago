@@ -1,10 +1,7 @@
 # SUPERHOT Archipelago player options.
 #
-# This is a minimal, ready-to-use sample -- apworld/superhot/Options.py doesn't define
-# any game-specific options yet (see its own docstring), so there's nothing to configure
-# beyond the two options every Archipelago world gets for free (progression_balancing,
-# accessibility). Copy this file, rename it, and change `name` if you want a second
-# player/slot for testing with more than one person in the same room.
+# Copy this file, rename it, and change `name` if you want a second player/slot for
+# testing with more than one person in the same room.
 #
 # See https://archipelago.gg/tutorial/Archipelago/setup/en for the general format if you
 # want to add more players to the same YAML file, or check other games' options.
@@ -21,3 +18,10 @@ SUPERHOT:
     50: 50
   accessibility:
     full: true
+
+  # How many of the other 31 story levels have to actually be completed before "34 -
+  # Free" (the real ending) can be entered, even once its own Level Access item has
+  # already been received -- see apworld/superhot/Options.py for the full explanation.
+  # 0-31, defaults to 25. Set to 0 to disable this and let the access item alone be
+  # enough, same as every other level.
+  levels_required_for_free: 25

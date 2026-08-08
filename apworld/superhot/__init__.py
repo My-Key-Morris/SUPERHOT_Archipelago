@@ -108,3 +108,14 @@ class SuperhotWorld(World):
         victory_location.place_locked_item(
             SuperhotItem("Victory", ItemClassification.progression, None, self.player)
         )
+
+    def fill_slot_data(self) -> dict:
+        # The only real per-player setting this world has so far. Not something logic
+        # itself needs to know about (see Options.py's LevelsRequiredForFree docstring
+        # for why) -- it's read purely by the mod, at connect time, to enforce its own
+        # real-time gate on "34 - Free" (mod/SuperhotArchipelago/Core/LevelAccessGuard.cs).
+        # Riding along in slot data, rather than a second place to configure it, is what
+        # keeps the YAML the single source of truth for this number.
+        return {
+            "levels_required_for_free": self.options.levels_required_for_free.value,
+        }

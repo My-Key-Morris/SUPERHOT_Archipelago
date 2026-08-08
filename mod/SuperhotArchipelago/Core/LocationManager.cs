@@ -183,5 +183,33 @@ namespace SuperhotArchipelago.Core
             long locationId = LevelCatalog.BaseId + LevelCatalog.SecretLocationIdOffset + level.Order;
             return _connection.Session.Locations.AllLocationsChecked.Contains(locationId);
         }
+
+        /// <summary>
+        /// How many of the other 31 story levels (every tracked level except "34 -
+        /// Free" itself) have actually had their completion check sent this run.
+        /// Used by Core/LevelAccessGuard.cs to gate entry to Free, and by
+        /// Patches/HubUnlockPatch.cs to show live progress on its hub button -- see
+        /// both for the real, explicit user request this exists for. Deliberately
+        /// excludes Free's own completion (IsLevelCompleted's special-cased "treated
+        /// as completed the moment it's unlocked" for it -- see that method's own
+        /// comment) so playing Free could never count toward its own requirement.
+        /// </summary>
+        public int CountOtherLevelsCompleted()
+        {
+            int count = 0;
+            foreach (LevelEntry level in LevelCatalog.Levels)
+            {
+                if (level.Order == LevelCatalog.Levels.Count)
+                {
+                    continue;
+                }
+
+                if (IsLevelCompleted(level.LevelId))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
     }
 }

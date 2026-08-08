@@ -23,6 +23,13 @@ The final level (LEVELS[-1], "34 - Free") has no completion location of its own 
 access item, so the main loop below skips it entirely rather than trying to fetch a
 location that no longer exists. It also has no secret (see data/levels.json), so there's
 nothing else to skip it for.
+
+Options.py's levels_required_for_free ("N of the other 31 levels must be actually
+completed before 34 - Free can be entered") deliberately has no access rule here.
+Reaching every other level's own location never depends on Free in any way, so the
+generator can't create a deadlock by not knowing about it -- it's purely a real-time gate
+the mod itself enforces during play, not something Archipelago's own reachability logic
+needs to reason about. See mod/SuperhotArchipelago/Core/LevelAccessGuard.cs.
 """
 from __future__ import annotations
 

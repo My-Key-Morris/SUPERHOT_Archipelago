@@ -53,22 +53,48 @@ namespace SuperhotArchipelago.Core
                 return false;
             }
 
-            if (entry.Order == 1 || UnlockState.IsUnlocked(tracked.ID))
+            if (entry.Order == 1)
             {
                 return false;
             }
 
-            // Real bug found by a playtest screenshot: the original, longer message here
-            // ("LOCKED -- 'X' needs an Archipelago item before you can play it.", up to 74
-            // characters for the longest level name) got visibly truncated on BOTH edges
-            // by the uptitle display -- it's a fixed-width Unity UI Text element (see
-            // TextManager.Uptitle), not something that wraps or shrinks to fit. Vanilla's
-            // own uptitle strings (e.g. "hack into a terminal to skip level", 35 chars)
-            // are much shorter, which is the actual evidence this needed shortening
-            // rather than a guess -- kept this well under that with real margin (39 chars
-            // for the longest level name) rather than cutting it as close as possible.
-            blockMessage = $"LOCKED: '{entry.DisplayName}' needs an AP item";
-            return true;
+            if (!UnlockState.IsUnlocked(tracked.ID))
+            {
+                // Real bug found by a playtest screenshot: the original, longer message here
+                // ("LOCKED -- 'X' needs an Archipelago item before you can play it.", up to 74
+                // characters for the longest level name) got visibly truncated on BOTH edges
+                // by the uptitle display -- it's a fixed-width Unity UI Text element (see
+                // TextManager.Uptitle), not something that wraps or shrinks to fit. Vanilla's
+                // own uptitle strings (e.g. "hack into a terminal to skip level", 35 chars)
+                // are much shorter, which is the actual evidence this needed shortening
+                // rather than a guess -- kept this well under that with real margin (39 chars
+                // for the longest level name) rather than cutting it as close as possible.
+                blockMessage = $"LOCKED: '{entry.DisplayName}' needs an AP item";
+                return true;
+            }
+
+            // Real, explicit user request: "34 - Free" (the game's real ending) gets a
+            // second, independent gate on top of the normal item-based one above -- even
+            // once its own access item is received, it stays locked until enough of the
+            // other 31 levels have actually been completed (not just unlocked). Stops a
+            // lucky early access item from ending the run before the player's engaged
+            // with most of the campaign. Threshold is a per-player apworld option
+            // (Options.py's levels_required_for_free) carried over slot data -- see
+            // Core/ArchipelagoConnection.cs's LevelsRequiredForFree. No other level has
+            // this second check.
+            if (entry.Order == LevelCatalog.Levels.Count)
+            {
+                int required = Mod.Connection?.LevelsRequiredForFree ?? 0;
+                int completed = Mod.Locations?.CountOtherLevelsCompleted() ?? 0;
+
+                if (completed < required)
+                {
+                    blockMessage = $"LOCKED: {completed}/{required} levels needed";
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
