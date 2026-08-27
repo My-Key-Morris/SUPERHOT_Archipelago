@@ -31,4 +31,9 @@ Thumbs.db
 # built from mod/SuperhotArchipelago's own build output), not source, and don't belong
 # in git history. The apworld's built copy is still tracked at dist/superhot.apworld
 # since that one *is* meant to live in a GitHub release built from this repo.
-/SuperhotArchipelago_v*.zip
+#
+# Real bug found while auditing repo hygiene: this pattern was anchored to the repo
+# root (leading slash), but the zip is actually built into dist/ -- so it was never
+# actually being ignored at all, and kept showing up as untracked in `git status`.
+# Un-anchored so it matches at any depth, same as the other patterns in this file.
+SuperhotArchipelago_v*.zip
