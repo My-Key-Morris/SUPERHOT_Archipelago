@@ -23,6 +23,18 @@ namespace SuperhotArchipelago.Core
     /// said "let it through" without ever looking far enough ahead to see that the real
     /// next tracked level past it was still locked. Fixed by resolving forward through any
     /// untracked entries to the next level we actually track before checking unlock state.
+    ///
+    /// Second real, explicit user request, reported after the above fix shipped: once the
+    /// resolved target IS unlocked, the forward-resolution above let the native flow play
+    /// through every untracked entry in between uninterrupted -- fine for a short segway
+    /// stub, but "22 - Hacker" -> "25 - Fall" runs through several of its own narrative
+    /// detour scenes this way, none of which the player has any way to skip. Whether the
+    /// resolved target is locked or not no longer matters for this: ShouldBlock now blocks
+    /// unconditionally whenever the raw level it's asked about isn't itself already the
+    /// next tracked level (see the `isDirectlyNextLevel` check below), sending the player
+    /// to the hub instead of auto-playing anything in between. A genuinely direct
+    /// transition -- no untracked entry between the current level and the next tracked one
+    /// -- still passes straight through to the real unlock check below, same as always.
     /// </summary>
     public static class LevelAccessGuard
     {
@@ -51,6 +63,29 @@ namespace SuperhotArchipelago.Core
             if (!LevelCatalog.LevelIdToLevel.TryGetValue(tracked.ID, out LevelEntry? entry))
             {
                 return false;
+            }
+
+            // Real, explicit user request, real reported case: "22 - Hacker" ends into a
+            // narrative detour of several untracked entries (its own credits/interlude
+            // scenes, none in our catalog) before the native flow would eventually land on
+            // "25 - Fall" -- and since ResolveToTrackedLevel above walks straight through
+            // those and only checks Fall's own unlock state, an unlocked Fall let the whole
+            // detour auto-play uninterrupted, cutscenes and all, with no way for the player
+            // to skip straight to the hub instead. Whether the eventual destination is
+            // locked or not is irrelevant here -- the player just shouldn't be walked
+            // through scenes outside our catalog automatically at all. So: if the raw level
+            // this call was actually asked about isn't ITSELF already the next tracked
+            // level (i.e. ResolveToTrackedLevel had to skip past at least one untracked
+            // entry to get here), block unconditionally and send the player to the hub,
+            // before any of those scenes get a chance to start. Only a genuinely direct
+            // transition -- the very next raw entry already IS the next tracked level, no
+            // detour in between -- skips this and falls through to the normal per-level
+            // checks below.
+            bool isDirectlyNextLevel = LevelCatalog.LevelIdToLevel.ContainsKey(level.ID);
+            if (!isDirectlyNextLevel)
+            {
+                blockMessage = "Return to hub to continue";
+                return true;
             }
 
             if (entry.Order == 1)
