@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.Xml.Linq;
-using HarmonyLib;
 using SuperhotArchipelago.Core;
 
 namespace SuperhotArchipelago.Patches
@@ -10,19 +7,6 @@ namespace SuperhotArchipelago.Patches
     /// design: instead of a hidden keybind, put the Archipelago connection menu behind a
     /// real, visible button on the hub's main screen, the same way "LEVELS"/"ENDLESS"/etc.
     /// already work.
-    ///
-    /// Confirmed via decompile rather than guessed: piOsMenu.CreateViewFromNode(XElement,
-    /// List&lt;int&gt;, List&lt;int&gt;, float, bool) is the one method that builds every hub
-    /// screen -- both the top-level root (called with e == null, from
-    /// CreateDirectoryStructure) and every folder navigated into (called recursively with
-    /// e == the clicked node). It assigns a brand new SHGUIcommanderview to its own private
-    /// createdView field on every single call (SHGUIcommanderview sHGUIcommanderview =
-    /// (createdView = new SHGUIcommanderview());) and sets that view's public isRoot field
-    /// from whether e started out null -- exactly the signal needed to add a button only to
-    /// the top-level screen, not every subfolder. Because a fresh view is created every
-    /// time (including every time the player returns to the hub), this Postfix runs once
-    /// per fresh root view and never needs to guard against adding a duplicate button to
-    /// the same view twice.
     ///
     /// SHGUIcommanderbutton's constructor (confirmed via decompile) takes a genuinely
     /// generic Action&lt;SHGUIcommanderbutton&gt; click delegate -- it is NOT hardcoded to
@@ -49,15 +33,10 @@ namespace SuperhotArchipelago.Patches
     /// recursive call for subfolders like "LEVELS", and a challenge-mode variant), and
     /// popping a pushed-on-top view (SHGUI.current.PopView(), e.g. pressing Esc to close
     /// ArchipelagoConnectApp) just reveals the same already-built root view again without
-    /// rebuilding it. So connecting successfully while already standing on the hub (open
-    /// ARCHIPELAGO, connect, Esc back) left the button's text exactly as stale as it was
-    /// the moment the root view was first built -- it never got a second chance to
-    /// recompute "ONLINE" until the player left all the way back to the Main Menu and
-    /// re-entered, which rebuilds the root view fresh. (Also confirmed
-    /// piOsMenu.LockUnfinishedLevels -- which HubUnlockPatch.cs piggybacks on for the
-    /// per-level three-state visuals and the Round 16 secret-badge fix -- only fires
-    /// inside the "LEVELS" subfolder's own view build, not the root's, so it can't help
-    /// refresh this button either; it's simply never present in that view.)
+    /// rebuilding it. So connecting successfully while already standing on the hub left the
+    /// button's text exactly as stale as it was the moment the root view was first built --
+    /// it never got a second chance to recompute "ONLINE" until the player left all the way
+    /// back to the Main Menu and re-entered, which rebuilds the root view fresh.
     ///
     /// Fix: keep a live reference to whichever button instance is currently on screen
     /// (Button below, overwritten every time a fresh one is built) and re-derive its label
@@ -70,30 +49,41 @@ namespace SuperhotArchipelago.Patches
     /// could throw on further access -- so no extra bookkeeping is needed to null this out
     /// when the player leaves the hub; it's simply overwritten the next time a fresh
     /// button is built, and briefly-orphaned updates in between have no visible effect.
+    ///
+    /// Round 27 follow-up, real explicit user request ("put all of the archipelago
+    /// selections that are in the hub into a folder"): this class no longer hooks
+    /// piOsMenu.CreateViewFromNode directly or adds itself to the hub's root view --
+    /// Patches/ArchipelagoFolderButtonPatch.cs now owns the one root-view hook (a single
+    /// "ARCHIPELAGO" folder button), and calls AddTo() below to place this button inside
+    /// that folder's own subfolder view instead (a plain SHGUIcommanderview built by hand
+    /// the same way piOsMenu.CreateViewFromNode itself builds "LEVELS"'s -- confirmed via
+    /// decompile, see that class's own docstring for the full reasoning). Renamed from
+    /// "ARCHIPELAGO" to "CONNECT" since living inside a folder already labeled
+    /// "ARCHIPELAGO" made the old label redundant. Everything else about this button (the
+    /// live ONLINE/OFFLINE label, RefreshLabel()'s own per-frame safety) is unchanged.
     /// </summary>
-    [HarmonyPatch(typeof(piOsMenu), "CreateViewFromNode",
-        new[] { typeof(XElement), typeof(List<int>), typeof(List<int>), typeof(float), typeof(bool) })]
     public static class ConnectionButtonPatch
     {
-        private const string ButtonLabel = "ARCHIPELAGO";
+        private const string ButtonLabel = "CONNECT";
 
         // Not cleared on view teardown -- see class doc for why that's unnecessary here.
         internal static SHGUIcommanderbutton? Button { get; private set; }
 
-        public static void Postfix(SHGUIcommanderview ___createdView)
+        /// <summary>
+        /// Builds this button and adds it to whatever view the caller passes in --
+        /// Patches/ArchipelagoFolderButtonPatch.cs's own "ARCHIPELAGO" subfolder view, not
+        /// the hub's root anymore. See class doc for why this changed from a direct
+        /// CreateViewFromNode Postfix.
+        /// </summary>
+        internal static void AddTo(SHGUIcommanderview view)
         {
-            if (___createdView == null || !___createdView.isRoot)
-            {
-                return;
-            }
-
             SHGUIcommanderbutton button = new SHGUIcommanderbutton(ButtonLabel.PadRight(12, ' ') + "│OFFLINE", 'w', delegate
             {
                 SHGUI.current.AddViewOnTop(new ArchipelagoConnectApp());
-            }).SetListLink(___createdView).SetData(
+            }).SetListLink(view).SetData(
                 "Set up or check your Archipelago server connection.");
 
-            ___createdView.AddButtonView(button);
+            view.AddButtonView(button);
 
             Button = button;
             RefreshLabel();

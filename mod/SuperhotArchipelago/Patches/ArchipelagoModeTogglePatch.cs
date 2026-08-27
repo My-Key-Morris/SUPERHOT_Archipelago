@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.Xml.Linq;
-using HarmonyLib;
 using SuperhotArchipelago.Core;
 
 namespace SuperhotArchipelago.Patches
@@ -12,15 +9,14 @@ namespace SuperhotArchipelago.Patches
     /// connect screen, Core/ArchipelagoConnectApp.cs) -- a single click flips the state
     /// directly, no screen to open first.
     ///
-    /// Structurally this is Patches/ConnectionButtonPatch.cs's twin: same "hook
-    /// piOsMenu.CreateViewFromNode's root view, keep a live button reference, and
-    /// re-derive its label every frame" pattern for the same reason (a direct
-    /// MelonPreferences.cfg edit to Config.Enabled while running is a supported parallel
-    /// path, same as Server/Slot/Password already are -- see Mod.cs). Kept as a separate
-    /// file rather than folded into ConnectionButtonPatch.cs because it's a conceptually
-    /// distinct feature (a mode switch with mod-wide effects, not a connection-status
-    /// display) -- consistent with this project's existing habit of one file per distinct
-    /// concern (see LevelGatePatch.cs/ViaAppGatePatch.cs/DirectLevelSkipPatch.cs/
+    /// Structurally this is Patches/ConnectionButtonPatch.cs's twin: same "keep a live
+    /// button reference and re-derive its label every frame" pattern for the same reason (a
+    /// direct MelonPreferences.cfg edit to Config.Enabled while running is a supported
+    /// parallel path, same as Server/Slot/Password already are -- see Mod.cs). Kept as a
+    /// separate file rather than folded into ConnectionButtonPatch.cs because it's a
+    /// conceptually distinct feature (a mode switch with mod-wide effects, not a connection-
+    /// status display) -- consistent with this project's existing habit of one file per
+    /// distinct concern (see LevelGatePatch.cs/ViaAppGatePatch.cs/DirectLevelSkipPatch.cs/
     /// TitleCardGatePatch.cs, all separate files gating different launch paths through the
     /// same shared check).
     ///
@@ -40,9 +36,14 @@ namespace SuperhotArchipelago.Patches
     /// actually un-vanilla is ever launchable in the gap; only some cosmetics can lag by one
     /// visit. Not worth forcing a view rebuild for pre-emptively; revisit if a real playtest
     /// finds this confusing in practice.
+    ///
+    /// Round 27 follow-up, real explicit user request ("put all of the archipelago
+    /// selections that are in the hub into a folder"): this class no longer hooks
+    /// piOsMenu.CreateViewFromNode directly or adds itself to the hub's root view --
+    /// Patches/ArchipelagoFolderButtonPatch.cs now owns the one root-view hook, and calls
+    /// AddTo() below to place this button inside its own "ARCHIPELAGO" subfolder view
+    /// instead. Label/behavior otherwise unchanged.
     /// </summary>
-    [HarmonyPatch(typeof(piOsMenu), "CreateViewFromNode",
-        new[] { typeof(XElement), typeof(List<int>), typeof(List<int>), typeof(float), typeof(bool) })]
     public static class ArchipelagoModeTogglePatch
     {
         private const string ButtonLabel = "AP MODE";
@@ -52,22 +53,23 @@ namespace SuperhotArchipelago.Patches
         // out, confirmed via decompile, not something that can throw on further access).
         internal static SHGUIcommanderbutton? Button { get; private set; }
 
-        public static void Postfix(SHGUIcommanderview ___createdView)
+        /// <summary>
+        /// Builds this button and adds it to whatever view the caller passes in --
+        /// Patches/ArchipelagoFolderButtonPatch.cs's own "ARCHIPELAGO" subfolder view, not
+        /// the hub's root anymore. See class doc for why this changed from a direct
+        /// CreateViewFromNode Postfix.
+        /// </summary>
+        internal static void AddTo(SHGUIcommanderview view)
         {
-            if (___createdView == null || !___createdView.isRoot)
-            {
-                return;
-            }
-
             SHGUIcommanderbutton button = new SHGUIcommanderbutton(BuildLabel(), 'w', delegate
             {
                 Mod.SetEnabled(!Config.Enabled.Value);
-            }).SetListLink(___createdView).SetData(
+            }).SetListLink(view).SetData(
                 "Turn Archipelago mode on or off. Off plays SUPERHOT exactly like vanilla " +
                 "-- no level gating, no hub overlay -- and drops any active connection. " +
                 "Turning back on reconnects and picks up right where you left off.");
 
-            ___createdView.AddButtonView(button);
+            view.AddButtonView(button);
 
             Button = button;
             RefreshLabel();

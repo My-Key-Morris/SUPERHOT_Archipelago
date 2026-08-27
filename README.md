@@ -37,18 +37,20 @@ The goal is beating the final level, same as vanilla.
 <details>
 <summary><h3 style="display: inline">What other changes are made to the game</h3></summary>
 
-- **Connecting is done in-game**, not by hand-editing a config file: an `ARCHIPELAGO`
-  icon on the hub's main screen (alongside `LEVELS`/`ENDLESS`) opens a real, native-styled
-  screen for entering your server/slot/password, with live connection status shown right
-  on the icon.
-- **Archipelago mode can be turned off** without uninstalling the mod: the `AP MODE` icon
+- **Everything Archipelago-related lives in one hub folder**: an `ARCHIPELAGO` icon on the
+  hub's main screen (alongside `LEVELS`/`ENDLESS`) opens a folder with three entries.
+- **Connecting is done in-game**, not by hand-editing a config file: the `CONNECT` entry
+  opens a real, native-styled screen for entering your server/slot/password, with live
+  connection status shown right on the icon.
+- **Archipelago mode can be turned off** without uninstalling the mod: the `AP MODE` entry
   flips between `ON` and `OFF` in one click. Off plays SUPERHOT exactly like vanilla — no
   level gating, no hub overlay — and drops any active connection; back on reconnects and
   picks up right where you left off.
 - **In-game notifications**: a short popup appears while playing whenever you receive an
   item or send a check — nothing pops up for the batch of past items a fresh connection
-  replays, only for genuinely new activity. An `AP LOG` icon opens a scrollable history of
-  everything received and sent this run, for anything you missed or want to look back on.
+  replays, only for genuinely new activity. The `AP LOG` entry opens a scrollable history
+  of everything received and sent this run, for anything you missed or want to look back
+  on.
 - The hub's native lock logic only supports two states (sequential-up-to-highest-finished,
   or everything unlocked) — a layer on top tracks Archipelago's own out-of-order unlocks
   without replacing that native logic.
@@ -87,10 +89,10 @@ The goal is beating the final level, same as vanilla.
    someone else's.
 6. Launch SUPERHOT. MelonLoader prints console output on top of the game — look for lines
    starting with `[SuperhotArchipelago]` confirming it loaded.
-7. On the hub's main screen (alongside `LEVELS`/`ENDLESS`), select the `ARCHIPELAGO` icon
-   and enter your server/slot/password — `Tab`/`Enter` move between fields, `Enter` on the
-   last field connects, `Esc` closes the screen. Settings are saved automatically, so you
-   won't need to re-enter them next launch.
+7. On the hub's main screen (alongside `LEVELS`/`ENDLESS`), open the `ARCHIPELAGO` folder
+   and select `CONNECT`, then enter your server/slot/password — `Tab`/`Enter` move between
+   fields, `Enter` on the last field connects, `Esc` closes the screen. Settings are saved
+   automatically, so you won't need to re-enter them next launch.
 8. Play the first level. Watch the MelonLoader console for a line confirming a check was
    sent — that's the sign everything's actually wired up correctly.
 
