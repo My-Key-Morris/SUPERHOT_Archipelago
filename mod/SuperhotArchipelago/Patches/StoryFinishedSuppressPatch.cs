@@ -34,6 +34,15 @@ namespace SuperhotArchipelago.Patches
     {
         public static bool Prefix(string key, object value)
         {
+            // Real, explicit user request: Archipelago mode can be turned off entirely to
+            // play vanilla (see Mod.IsEnabled/Patches/ArchipelagoModeTogglePatch.cs) --
+            // while off, the real ending should behave exactly like vanilla SUPERHOT,
+            // fake-out and all, not have this suppression silently still running.
+            if (!Mod.IsEnabled)
+            {
+                return true;
+            }
+
             if (key == "storyFinished" && value is bool isFinished && isFinished)
             {
                 Mod.Log?.Msg("Suppressed SetValue(\"storyFinished\", true) -- this only ever " +

@@ -49,6 +49,18 @@ namespace SuperhotArchipelago.Core
         {
             blockMessage = "";
 
+            // Real, explicit user request: Archipelago mode can be turned off entirely
+            // (Mod.IsEnabled, see Patches/ArchipelagoModeTogglePatch.cs) to play vanilla
+            // SUPERHOT without uninstalling the mod. Since every gate that can block a
+            // level launch funnels through this one method, checking it here once is
+            // enough to make every one of them a no-op while disabled -- nothing further
+            // down this method runs, so nothing is ever blocked, exactly like the mod
+            // wasn't installed at all for gating purposes.
+            if (!Mod.IsEnabled)
+            {
+                return false;
+            }
+
             if (level == null || string.IsNullOrEmpty(level.SceneFileName))
             {
                 return false;

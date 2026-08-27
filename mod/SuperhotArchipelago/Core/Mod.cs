@@ -2,7 +2,7 @@ using MelonLoader;
 
 // CONFIRMED against the real install's SH_Data/app.info, which literally contains these
 // two strings on their own lines.
-[assembly: MelonInfo(typeof(SuperhotArchipelago.Core.Mod), "SuperhotArchipelago", "0.1.0", "Michael")]
+[assembly: MelonInfo(typeof(SuperhotArchipelago.Core.Mod), "SuperhotArchipelago", "0.1.1", "Michael")]
 [assembly: MelonGame("SUPERHOT_Team", "SUPERHOT")]
 
 namespace SuperhotArchipelago.Core
@@ -34,11 +34,22 @@ namespace SuperhotArchipelago.Core
         private static Mod? _instance;
 
         // Set for the duration of ApplyConnectionSettingsAndConnect's three Config.*.Value
-        // writes below, so the OnEntryValueChanged-driven auto-reconnect (still wired up
-        // for the original "hand-edit MelonPreferences.cfg" workflow) doesn't fire three
-        // separate, sequential, blocking connect attempts for one user action -- only the
-        // explicit TryConnect() call at the end of that method actually connects.
+        // writes, and SetEnabled's one, below, so the OnEntryValueChanged-driven
+        // auto-apply (still wired up for the original "hand-edit MelonPreferences.cfg"
+        // workflow) doesn't fire a second, redundant connect/disconnect attempt for one
+        // user action -- only the explicit call at the end of each of those methods
+        // actually connects/disconnects.
         private static bool _suppressAutoReconnect;
+
+        // Real, explicit user request: a way to switch between playing through
+        // Archipelago and playing normally without uninstalling/reinstalling the mod.
+        // Every patch that gates level access, overlays hub visuals, or reports checks
+        // reads this (directly or via LevelAccessGuard.ShouldBlock, which every gating
+        // patch already funnels through) and skips its own work entirely when false, so
+        // SUPERHOT plays exactly like vanilla -- see Patches/ArchipelagoModeTogglePatch.cs
+        // for the hub button that flips this, and NOTES.md for the full list of what
+        // turning this off actually touches.
+        public static bool IsEnabled => Config.Enabled.Value;
 
         public override void OnInitializeMelon()
         {
@@ -53,7 +64,12 @@ namespace SuperhotArchipelago.Core
             Locations = new LocationManager(Connection, LoggerInstance);
             Items = new ItemManager(Connection, LoggerInstance);
 
-            if (Config.IsConfigured)
+            if (!Config.Enabled.Value)
+            {
+                LoggerInstance.Msg("Not connecting yet: Archipelago mode is turned off. Click " +
+                    "the AP MODE icon on the hub's main screen to turn it back on.");
+            }
+            else if (Config.IsConfigured)
             {
                 TryConnect();
             }
@@ -69,11 +85,12 @@ namespace SuperhotArchipelago.Core
             Config.Server.OnEntryValueChanged.Subscribe((_, _) => TryConnect());
             Config.Slot.OnEntryValueChanged.Subscribe((_, _) => TryConnect());
             Config.Password.OnEntryValueChanged.Subscribe((_, _) => TryConnect());
+            Config.Enabled.OnEntryValueChanged.Subscribe((_, _) => ApplyEnabledChange());
         }
 
         private void TryConnect()
         {
-            if (_suppressAutoReconnect || !Config.IsConfigured)
+            if (_suppressAutoReconnect || !Config.Enabled.Value || !Config.IsConfigured)
             {
                 return;
             }
@@ -81,6 +98,59 @@ namespace SuperhotArchipelago.Core
             LoggerInstance.Msg($"Connecting to '{Config.Server.Value}' as '{Config.Slot.Value}'...");
             Connection?.Connect(Config.Server.Value, Config.Slot.Value,
                 Config.Password.Value == "" ? null : Config.Password.Value);
+        }
+
+        // Called by Patches/ArchipelagoModeTogglePatch.cs's hub button. Same
+        // explicit-set-then-apply shape as ApplyConnectionSettingsAndConnect below, and
+        // for the same reason: suppresses the OnEntryValueChanged-driven path so this one
+        // click doesn't also trigger a second, redundant connect/disconnect attempt.
+        public static void SetEnabled(bool enabled)
+        {
+            if (_instance == null)
+            {
+                return;
+            }
+
+            _suppressAutoReconnect = true;
+            try
+            {
+                Config.Enabled.Value = enabled;
+                Config.Save();
+            }
+            finally
+            {
+                _suppressAutoReconnect = false;
+            }
+
+            ApplyEnabledChange();
+        }
+
+        // Shared by SetEnabled above (the hub button) and the OnEntryValueChanged
+        // subscription in OnInitializeMelon (a direct MelonPreferences.cfg edit while the
+        // game is running -- same parallel path Server/Slot/Password already support).
+        // Real, explicit user request: turning this off should actually drop any live
+        // connection, not just stop enforcing gates locally while the socket stays open
+        // -- and turning it back on should reconnect (which replays this slot's full item
+        // history, per Archipelago.MultiClient.Net's own AllItems handling, so
+        // UnlockState.cs ends up exactly where it left off with no extra bookkeeping
+        // needed here).
+        private static void ApplyEnabledChange()
+        {
+            if (_suppressAutoReconnect)
+            {
+                return;
+            }
+
+            if (Config.Enabled.Value)
+            {
+                Log?.Msg("Archipelago mode turned ON.");
+                _instance?.TryConnect();
+            }
+            else
+            {
+                Log?.Msg("Archipelago mode turned OFF -- SUPERHOT will play like vanilla until it's turned back on.");
+                Connection?.Disconnect();
+            }
         }
 
         // Called by Core/ArchipelagoConnectApp.cs when the player submits the PASSWORD
@@ -106,6 +176,15 @@ namespace SuperhotArchipelago.Core
                 Config.Server.Value = server;
                 Config.Slot.Value = slot;
                 Config.Password.Value = password;
+
+                // Real, explicit user request, found while designing the AP MODE toggle:
+                // submitting this screen is a clear enough signal of intent that it should
+                // also flip Archipelago mode back on if it was off -- otherwise TryConnect()
+                // below silently no-ops on its own !Config.Enabled.Value check, and a player
+                // who forgot they'd turned it off would see nothing happen with no obvious
+                // reason why.
+                Config.Enabled.Value = true;
+
                 Config.Save();
             }
             finally
@@ -131,6 +210,12 @@ namespace SuperhotArchipelago.Core
             // drift out of sync with the real connection state again, cheap no-op included
             // (early-returns immediately if the button isn't currently on screen).
             Patches.ConnectionButtonPatch.RefreshLabel();
+
+            // Same reasoning as the line above, for the AP MODE toggle button -- its
+            // state can also change from outside its own click handler (a direct
+            // MelonPreferences.cfg edit while running), so it's re-derived every frame
+            // rather than only right after creation.
+            Patches.ArchipelagoModeTogglePatch.RefreshLabel();
         }
 
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
@@ -139,6 +224,40 @@ namespace SuperhotArchipelago.Core
             // real playthrough's log of this is the ground truth for whether
             // "TheyAreYourTools_C_2" etc. really do recur, and in what order.
             LoggerInstance.Msg($"Scene loaded: {sceneName} (buildIndex {buildIndex})");
+
+            // Real bug found by a live playtest of the AP mode toggle: Patches/HubUnlockPatch.cs
+            // (per-level lock/color/badge visuals) was silently never running at all -- not a
+            // regression from the toggle feature itself, but a pre-existing, latent issue this
+            // was the first time anyone actually verified HubUnlockPatch live in a running game
+            // in a while. Root cause, confirmed by reading this exact save file directly:
+            // "storyFinished" was already true on disk, almost certainly written before
+            // Patches/StoryFinishedSuppressPatch.cs ever existed to stop it (that patch only
+            // blocks *new* writes of true -- it does nothing about a value already saved).
+            // Confirmed via decompile (see StoryFinishedSuppressPatch.cs's own docstring):
+            // piOsMenu's "storylevels" case only calls piOsMenu.LockUnfinishedLevels() -- the
+            // method HubUnlockPatch.cs hooks -- when storyFinished is false. With it stuck true,
+            // that method (and therefore HubUnlockPatch's entire Postfix) never gets called at
+            // all, leaving every level exactly as native's own last real pass left it -- which,
+            // combined with this save's "highestfinishedLevel" also already being maxed out from
+            // extensive past testing, meant every level rendered as native "already finished"
+            // (clean text, white) instead of AP's own scrambled/locked look. The actual launch
+            // gate (LevelAccessGuard.ShouldBlock, called independently at click time) was never
+            // affected by any of this -- it doesn't depend on LockUnfinishedLevels() running at
+            // all -- which is exactly why genuinely locked levels still correctly refused to
+            // launch even while looking wrongly unlocked.
+            //
+            // Fixed by actively resetting the flag (not just suppressing future writes) the
+            // moment it's found true while Archipelago mode is on -- scoped to IsEnabled so
+            // vanilla play (mode off) is never touched: a player genuinely finishing the game
+            // vanilla should still get the real ending behavior. SetValue(false) here passes
+            // straight through StoryFinishedSuppressPatch's own Prefix untouched (it only
+            // intercepts writes of true), so this doesn't fight that patch.
+            if (IsEnabled && SaveManager.Instance != null && SaveManager.Instance.GetValueAs("storyFinished", false))
+            {
+                LoggerInstance.Msg("Found 'storyFinished' already true on disk (likely saved before this " +
+                    "mod suppressed it) -- resetting to false so the hub's per-level lock pass can run again.");
+                SaveManager.Instance.SetValue("storyFinished", false);
+            }
 
             // Last-resort safety net, added after a real playtest found a level ("25 -
             // Fall") getting force-loaded regardless of unlock state through some path

@@ -81,6 +81,25 @@ namespace SuperhotArchipelago.Patches
     {
         public static void Postfix()
         {
+            // Real, explicit user request: Archipelago mode can be turned off entirely to
+            // play vanilla (see Core/Mod.cs's IsEnabled/Patches/ArchipelagoModeTogglePatch.cs).
+            // Skipping this whole pass while off leaves the native lock/scramble result
+            // (which just ran, right before this Postfix) completely untouched -- real
+            // save-progress-based locking and colors, no AP overlay text at all.
+            //
+            // Real bug found by a live playtest: this Postfix can go silently uncalled
+            // entirely, for reasons that have nothing to do with the checks below -- see
+            // Mod.cs's OnSceneWasLoaded for the actual root cause (a stale "storyFinished"
+            // save flag) and fix (resetting it). Worth knowing about if this ever looks
+            // broken again: nothing in this method running is a much likelier explanation
+            // than a logic bug inside it, since piOsMenu.LockUnfinishedLevels() -- the
+            // method this Postfix is attached to -- native code sometimes doesn't call at
+            // all.
+            if (!SuperhotArchipelago.Core.Mod.IsEnabled)
+            {
+                return;
+            }
+
             if (SHGUI.current == null)
             {
                 return;

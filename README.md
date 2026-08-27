@@ -41,6 +41,10 @@ The goal is beating the final level, same as vanilla.
   icon on the hub's main screen (alongside `LEVELS`/`ENDLESS`) opens a real, native-styled
   screen for entering your server/slot/password, with live connection status shown right
   on the icon.
+- **Archipelago mode can be turned off** without uninstalling the mod: the `AP MODE` icon
+  flips between `ON` and `OFF` in one click. Off plays SUPERHOT exactly like vanilla — no
+  level gating, no hub overlay — and drops any active connection; back on reconnects and
+  picks up right where you left off.
 - The hub's native lock logic only supports two states (sequential-up-to-highest-finished,
   or everything unlocked) — a layer on top tracks Archipelago's own out-of-order unlocks
   without replacing that native logic.

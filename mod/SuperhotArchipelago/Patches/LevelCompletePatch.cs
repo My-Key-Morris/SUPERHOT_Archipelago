@@ -1,4 +1,5 @@
 using HarmonyLib;
+using SuperhotArchipelago.Core;
 
 namespace SuperhotArchipelago.Patches
 {
@@ -26,13 +27,24 @@ namespace SuperhotArchipelago.Patches
     {
         public static void Postfix()
         {
+            // Real, explicit user request: Archipelago mode can be turned off entirely to
+            // play vanilla (see Mod.IsEnabled/Patches/ArchipelagoModeTogglePatch.cs).
+            // LocationManager.CheckLocation already no-ops safely if disconnected, but
+            // skipping the attempt here entirely avoids a misleading "called before
+            // connecting" warning on every level finished while deliberately playing
+            // vanilla -- that warning is meant for "haven't configured yet", not this.
+            if (!Mod.IsEnabled)
+            {
+                return;
+            }
+
             LevelInfo finished = LevelSetup.CurrentLevelInfo;
             if (finished == null)
             {
                 return;
             }
 
-            SuperhotArchipelago.Core.Mod.Locations?.CheckLocation(finished.ID);
+            Mod.Locations?.CheckLocation(finished.ID);
         }
     }
 }

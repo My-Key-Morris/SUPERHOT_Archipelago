@@ -38,6 +38,17 @@ namespace SuperhotArchipelago.Core
         public static MelonPreferences_Entry<string> Slot { get; private set; } = null!;
         public static MelonPreferences_Entry<string> Password { get; private set; } = null!;
 
+        // Real, explicit user request: a way to switch between playing through
+        // Archipelago and playing normally without uninstalling/reinstalling the mod.
+        // Defaults to true (not false) specifically so upgrading an already-configured
+        // install to this version doesn't silently stop gating levels for someone
+        // mid-run -- CreateEntry's default only ever applies the first time this key is
+        // seen, so existing players get continuity, and only see this at all if they
+        // explicitly turn it off. See Mod.cs's IsEnabled/SetEnabled for where this
+        // actually gets read/written, and Patches/ArchipelagoModeTogglePatch.cs for the
+        // hub button that flips it in-game.
+        public static MelonPreferences_Entry<bool> Enabled { get; private set; } = null!;
+
         public static void Load()
         {
             _category = MelonPreferences.CreateCategory(
@@ -52,6 +63,10 @@ namespace SuperhotArchipelago.Core
             Password = _category.CreateEntry(
                 "Password", "", "Password",
                 "Room password, if the server has one set. Leave blank otherwise.");
+            Enabled = _category.CreateEntry(
+                "Enabled", true, "Enabled",
+                "Whether Archipelago mode is on. Turn off to play vanilla SUPERHOT (no " +
+                "level gating, no hub overlay) without uninstalling the mod.");
 
             _category.SaveToFile(printmsg: false);
         }

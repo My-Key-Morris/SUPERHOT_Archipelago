@@ -41,7 +41,7 @@ namespace SuperhotArchipelago.Patches
             }
 
             TextManager.AddUptitleToQueue(new LocalizableText(blockMessage));
-            Core.Mod.Log?.Msg($"Blocked launch of '{level.SceneFileName}' via LaunchLevelViaApp -- not yet unlocked. Returning to hub.");
+            Core.Mod.Log?.Msg($"Blocked launch of '{level.SceneFileName}' via LaunchLevelViaApp -- {blockMessage}. Returning to hub.");
 
             if (SHGUI.current != null)
             {

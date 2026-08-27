@@ -46,6 +46,16 @@ namespace SuperhotArchipelago.Patches
                 return;
             }
 
+            // Real, explicit user request: Archipelago mode can be turned off entirely to
+            // play vanilla (see Mod.IsEnabled/Patches/ArchipelagoModeTogglePatch.cs) --
+            // same reasoning as LevelCompletePatch.cs/SecretFoundPatch.cs for skipping the
+            // report attempt entirely rather than relying on CheckLocation's own
+            // not-connected guard.
+            if (!Mod.IsEnabled)
+            {
+                return;
+            }
+
             LevelInfo finished = LevelSetup.CurrentLevelInfo;
             if (finished == null)
             {
@@ -70,7 +80,7 @@ namespace SuperhotArchipelago.Patches
 
             TextManager.AddUptitleToQueue(new LocalizableText(blockMessage));
             Mod.Log?.Msg($"Blocked auto-transition to '{next.SceneFileName}' before any " +
-                "static/camera transition started -- not yet unlocked. Returning to hub.");
+                $"static/camera transition started -- {blockMessage}. Returning to hub.");
 
             if (SHGUI.current != null)
             {

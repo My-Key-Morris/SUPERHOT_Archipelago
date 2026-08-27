@@ -1,4 +1,5 @@
 using HarmonyLib;
+using SuperhotArchipelago.Core;
 
 namespace SuperhotArchipelago.Patches
 {
@@ -38,6 +39,16 @@ namespace SuperhotArchipelago.Patches
     {
         public static bool Prefix(ref bool __result)
         {
+            // Real, explicit user request: Archipelago mode can be turned off entirely to
+            // play vanilla (see Mod.IsEnabled/Patches/ArchipelagoModeTogglePatch.cs).
+            // "Fully vanilla" means this override backs off too -- let the native
+            // tag-based visibility check run and decide for itself, same as if this mod
+            // weren't installed.
+            if (!Mod.IsEnabled)
+            {
+                return true;
+            }
+
             __result = true;
             return false;
         }

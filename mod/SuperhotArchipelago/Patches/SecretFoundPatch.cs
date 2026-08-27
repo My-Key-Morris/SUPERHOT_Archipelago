@@ -1,4 +1,5 @@
 using HarmonyLib;
+using SuperhotArchipelago.Core;
 
 namespace SuperhotArchipelago.Patches
 {
@@ -47,6 +48,15 @@ namespace SuperhotArchipelago.Patches
 
         public static void Postfix(bool ___secretFound, bool __state)
         {
+            // Real, explicit user request: Archipelago mode can be turned off entirely to
+            // play vanilla (see Mod.IsEnabled/Patches/ArchipelagoModeTogglePatch.cs) --
+            // same reasoning as LevelCompletePatch.cs for skipping the report attempt
+            // entirely rather than relying on CheckSecretLocation's own not-connected guard.
+            if (!Mod.IsEnabled)
+            {
+                return;
+            }
+
             bool justFoundForTheFirstTime = !__state && ___secretFound;
             if (!justFoundForTheFirstTime)
             {
@@ -59,7 +69,7 @@ namespace SuperhotArchipelago.Patches
                 return;
             }
 
-            SuperhotArchipelago.Core.Mod.Locations?.CheckSecretLocation(current.ID);
+            Mod.Locations?.CheckSecretLocation(current.ID);
         }
     }
 }

@@ -112,5 +112,39 @@ namespace SuperhotArchipelago.Core
             _log.Msg($"Connected to Archipelago as '{slotName}'.");
             Connected?.Invoke();
         }
+
+        // Real, explicit user request: needed so turning Archipelago mode off
+        // (Mod.SetEnabled(false), see Patches/ArchipelagoModeTogglePatch.cs) can actually
+        // drop the connection rather than just ignoring it locally while the socket stays
+        // open in the background. Session.Socket.DisconnectAsync() is the real, confirmed
+        // API (found by reflecting the referenced Archipelago.MultiClient.Net.dll --
+        // IArchipelagoSocketHelper.DisconnectAsync(), no ilspycmd available in this
+        // environment at the time, reflection was the faster way to confirm it exists).
+        // Deliberately fire-and-forget: awaiting it here would need this method to become
+        // async, and the only thing it closes is the socket -- no game/Unity state to
+        // wait on -- so blocking Unity's main thread for it isn't worth it, same reasoning
+        // ItemManager already queues ItemReceived's off-thread events instead of handling
+        // them inline.
+        public void Disconnect()
+        {
+            if (Session == null)
+            {
+                IsConnected = false;
+                return;
+            }
+
+            try
+            {
+                _ = Session.Socket.DisconnectAsync();
+            }
+            catch (Exception ex)
+            {
+                _log.Warning($"Error while disconnecting from the Archipelago server: {ex.Message}");
+            }
+
+            Session = null;
+            IsConnected = false;
+            _log.Msg("Disconnected from the Archipelago server.");
+        }
     }
 }
