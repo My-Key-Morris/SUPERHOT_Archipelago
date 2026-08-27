@@ -51,6 +51,26 @@ namespace SuperhotArchipelago.Core
         // turning this off actually touches.
         public static bool IsEnabled => Config.Enabled.Value;
 
+        // Real bug found by live testing: IsEnabled above only reflects the player's
+        // *intent* to run in Archipelago mode (a straight passthrough of the config
+        // toggle) -- it says nothing about whether a live connection actually exists
+        // right now. Toggling AP MODE back on kicks off a synchronous reconnect attempt
+        // (TryConnect() -> ArchipelagoConnection.Connect()), but if that attempt fails
+        // for any reason (server not running yet, wrong password, a network hiccup)
+        // nothing reverts Config.Enabled.Value back to false -- IsEnabled stays true
+        // regardless. OnSceneWasLoaded's two save-data resync blocks below used to gate
+        // on IsEnabled alone, so the very next scene load (even just re-entering the hub)
+        // would run them with Session == null -- Locations.IsSecretCompleted()/
+        // IsLevelCompleted() can't authoritatively answer anything without a live
+        // session, so every one of those calls silently read as "not completed" and got
+        // written straight into the save file, overwriting real, previously-correct data
+        // with it. Confirmed as the root cause of a real bug report: "for the original
+        // file it says secret not cracked despite it being cracked," right after
+        // toggling AP mode off and back on. Both resync blocks now also require this --
+        // an actual live connection, not just the config toggle's intent -- before
+        // touching any save data.
+        private static bool IsFullyConnected => Connection != null && Connection.IsConnected;
+
         public override void OnInitializeMelon()
         {
             _instance = this;
@@ -263,7 +283,7 @@ namespace SuperhotArchipelago.Core
             // vanilla should still get the real ending behavior. SetValue(false) here passes
             // straight through StoryFinishedSuppressPatch's own Prefix untouched (it only
             // intercepts writes of true), so this doesn't fight that patch.
-            if (IsEnabled && SaveManager.Instance != null && SaveManager.Instance.GetValueAs("storyFinished", false))
+            if (IsEnabled && IsFullyConnected && SaveManager.Instance != null && SaveManager.Instance.GetValueAs("storyFinished", false))
             {
                 LoggerInstance.Msg("Found 'storyFinished' already true on disk (likely saved before this " +
                     "mod suppressed it) -- resetting to false so the hub's per-level lock pass can run again.");
@@ -298,7 +318,7 @@ namespace SuperhotArchipelago.Core
             // here: this only ever runs once per fresh scene load, before any in-level
             // interaction, so it can never race with or revert a genuine find made
             // during the level visit that's ending right as this runs.
-            if (IsEnabled && SaveManager.Instance != null && Locations != null)
+            if (IsEnabled && IsFullyConnected && SaveManager.Instance != null && Locations != null)
             {
                 foreach (LevelEntry entry in LevelCatalog.Levels)
                 {
