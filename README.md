@@ -24,13 +24,19 @@ The goal is beating the final level, same as vanilla.
 <details>
 <summary><h3 style="display: inline">What gets randomized</h3></summary>
 
-- **58 locations:** one `<level> Complete` for 31 of the 32 real levels, plus one
-  `<level> Secret` for the 27 levels that have an in-level secret console. The 32nd level
-  (the game's real ending) has no completion location of its own.
-- **58 real items + 1 event:** one `Level Access` item for every level except the first
-  (its location has no access rule, so it's always open — an item for it would do
-  nothing), padded with `White Space` filler items to match the location count, plus the
-  logic-only `Victory` event.
+- **58 locations by default:** one `<level> Complete` for 31 of the 32 real levels, plus
+  one `<level> Secret` for the 27 levels that have an in-level secret console. The 32nd
+  level (the game's real ending) has no completion location of its own.
+- **58 real items + 1 event by default:** one `Level Access` item for every level except
+  the first (its location has no access rule, so it's always open — an item for it would
+  do nothing), padded with `White Space` filler items to match the location count, plus
+  the logic-only `Victory` event.
+- **Optionally excludable levels:** the `exclude_slow_levels` YAML option (off by default)
+  removes `99 - Dog1`, `98 - Dog2`, `99 - Dog3`, and `32 - Longway` (including Longway's
+  secret) from both pools entirely — they're known for slower, more repetitive gameplay
+  than the rest of the campaign. An excluded level stays freely playable in-game, always
+  unlocked, exactly like `01 - Kick`; it just isn't part of the multiworld item/location
+  pool. See `dist/superhot_michael.yaml` for where to set it.
 
 </details>
 

@@ -14,12 +14,13 @@ from .Items import (
     LEVELS,
     WHITE_SPACE_ITEM_NAME,
     SuperhotItem,
+    is_excluded,
     item_name_groups,
     item_name_to_id,
     item_table,
     level_item_name,
 )
-from .Locations import location_name_to_id, location_table
+from .Locations import location_name_to_id
 from .Options import SuperhotOptions
 from .Regions import VICTORY_LOCATION_NAME, create_regions
 from .Rules import set_rules
@@ -70,10 +71,23 @@ class SuperhotWorld(World):
         # Space item larger than before. The separate Victory event location created in
         # Regions.py holds the locked Victory item and isn't part of this regular
         # pool/fill count.
+        #
+        # Real, explicit user request (ExcludeSlowLevels, see Options.py): a level this
+        # option excludes gets no item either, for the same reason level 1 doesn't -- its
+        # location doesn't exist for this player (see Regions.py), so an access item for
+        # it would be as much of a no-op as level 1's own always-would-be. real_item_count
+        # below tracks exactly how many real items this loop actually appended (not
+        # len(LEVELS) - 1, which would be wrong once any are excluded), so the filler math
+        # after it self-balances regardless of how many levels this player's own options
+        # excluded.
+        real_item_count = 0
         for level in LEVELS:
             if level["order"] == 1:
                 continue
+            if is_excluded(level, self.options):
+                continue
             self.multiworld.itempool.append(self.create_item(level_item_name(level)))
+            real_item_count += 1
 
         # Real bug found by a direct question about how this world handles filler,
         # confirmed by actually running Fill.distribute_items_restrictive() outside the
@@ -88,10 +102,20 @@ class SuperhotWorld(World):
         # world is expected to pad its own pool in create_items() -- this was silently
         # missing here since the location count changed but this loop was never revisited
         # to match. Fixed by explicitly filling the remainder with create_filler() calls
-        # (see get_filler_item_name below for what that actually returns). The "- 1" here
-        # accounts for level 1's skipped item above -- one more filler needed than levels
-        # actually get their own item now.
-        filler_needed = len(location_table) - (len(LEVELS) - 1)
+        # (see get_filler_item_name below for what that actually returns).
+        #
+        # real_location_count mirrors Regions.py's own create_regions loop exactly (same
+        # "skip the final level's own completion, skip anything is_excluded() flags, add
+        # one more for hasSecret" shape) rather than reading the static len(location_table)
+        # -- that table intentionally stays the full, unfiltered universe regardless of
+        # this player's own options (see Regions.py's own docstring), so it can't be used
+        # here once exclusion makes the real, per-player count sometimes smaller.
+        real_location_count = sum(
+            (0 if level is LEVELS[-1] else 1) + (1 if level["hasSecret"] else 0)
+            for level in LEVELS
+            if not is_excluded(level, self.options)
+        )
+        filler_needed = real_location_count - real_item_count
         for _ in range(filler_needed):
             self.multiworld.itempool.append(self.create_filler())
 
@@ -118,12 +142,26 @@ class SuperhotWorld(World):
         )
 
     def fill_slot_data(self) -> dict:
-        # The only real per-player setting this world has so far. Not something logic
-        # itself needs to know about (see Options.py's LevelsRequiredForFree docstring
-        # for why) -- it's read purely by the mod, at connect time, to enforce its own
-        # real-time gate on "34 - Free" (mod/SuperhotArchipelago/Core/LevelAccessGuard.cs).
-        # Riding along in slot data, rather than a second place to configure it, is what
-        # keeps the YAML the single source of truth for this number.
+        # levels_required_for_free: not something logic itself needs to know about (see
+        # Options.py's LevelsRequiredForFree docstring for why) -- it's read purely by the
+        # mod, at connect time, to enforce its own real-time gate on "34 - Free"
+        # (mod/SuperhotArchipelago/Core/LevelAccessGuard.cs). Riding along in slot data,
+        # rather than a second place to configure it, is what keeps the YAML the single
+        # source of truth for this number.
+        #
+        # excluded_level_orders: real, explicit user request (ExcludeSlowLevels, see
+        # Options.py) -- the mod needs to know which levels this player's own options
+        # excluded so it can treat them as always-unlocked/always-complete and never try
+        # to send a check for a location that doesn't exist in this generation
+        # (mod/SuperhotArchipelago/Core/LocationManager.cs/LevelAccessGuard.cs). Sent as a
+        # plain list of "order" values (LevelEntry.Order on the mod side) rather than a
+        # single "exclude_slow_levels" bool plus a hardcoded name list on both sides --
+        # this way only Items.py's SLOW_LEVEL_NAMES ever needs to change if the exact set
+        # of "slow" levels is ever revisited later; the mod never needs its own copy of
+        # that list to go out of sync with.
         return {
             "levels_required_for_free": self.options.levels_required_for_free.value,
+            "excluded_level_orders": sorted(
+                level["order"] for level in LEVELS if is_excluded(level, self.options)
+            ),
         }

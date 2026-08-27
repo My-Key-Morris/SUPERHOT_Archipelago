@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from Options import PerGameCommonOptions, Range
+from Options import PerGameCommonOptions, Range, Toggle
 
 
 class LevelsRequiredForFree(Range):
@@ -24,6 +24,24 @@ class LevelsRequiredForFree(Range):
     default = 25
 
 
+class ExcludeSlowLevels(Toggle):
+    """Real, explicit user request: excludes "99 - Dog1", "98 - Dog2", "99 - Dog3", and
+    "32 - Longway" from the location and item pools entirely -- known for slow, repetitive
+    gameplay relative to the rest of the campaign, and requested as a fixed set (this is
+    one on/off switch, not a per-level pick list).
+
+    With this on, none of the four get their own checkable location (main or secret) or
+    their own Level Access item -- their pool slots are simply padded out with more filler
+    instead (see __init__.py's create_items). The mod's own gating treats them exactly
+    like "01 - Kick": always unlocked, no item required, and their hub badges/completion
+    display always shows them as done -- see mod/SuperhotArchipelago/Core/LocationManager.cs
+    and Core/LevelAccessGuard.cs. They stay real, playable levels in the hub, just entirely
+    outside the randomizer's own tracking.
+    """
+    display_name = "Exclude Slow Levels"
+
+
 @dataclass
 class SuperhotOptions(PerGameCommonOptions):
     levels_required_for_free: LevelsRequiredForFree
+    exclude_slow_levels: ExcludeSlowLevels

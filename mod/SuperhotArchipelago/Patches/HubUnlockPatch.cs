@@ -237,7 +237,16 @@ namespace SuperhotArchipelago.Patches
                 // hub button instead of just this one shifting.
                 string? freeStatusSuffix = freeStillGated ? $"{freeCompleted}/{freeRequired}".PadRight(8) : null;
 
-                bool unlocked = entry.Order == 1 || SuperhotArchipelago.Core.UnlockState.IsUnlocked(levelInfo.ID);
+                // Real, explicit user request (ExcludeSlowLevels): an excluded level has no
+                // access item to ever receive (see apworld/superhot/__init__.py's
+                // create_items), so it can never earn "unlocked" through
+                // UnlockState.IsUnlocked -- always shown/treated as unlocked instead, same
+                // as level 1's own special case, so it never displays as permanently
+                // locked in the hub for a level the player can freely walk into anyway
+                // (see Core/LevelAccessGuard.cs).
+                bool unlocked = entry.Order == 1
+                    || (SuperhotArchipelago.Core.Mod.Connection != null && SuperhotArchipelago.Core.Mod.Connection.IsLevelExcluded(entry.Order))
+                    || SuperhotArchipelago.Core.UnlockState.IsUnlocked(levelInfo.ID);
 
                 if (!SuperhotArchipelago.Core.ButtonTextCache.TryGet(levelInfo.ID, out string cleanName))
                 {

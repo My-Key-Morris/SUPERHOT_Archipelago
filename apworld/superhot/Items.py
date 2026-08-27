@@ -47,6 +47,24 @@ _raw_levels_json = pkgutil.get_data(__name__, "data/levels.json")
 assert _raw_levels_json is not None, "data/levels.json missing from the superhot world package"
 LEVELS = json.loads(_raw_levels_json)["levels"]
 
+# Real, explicit user request: "exclude levels with boring/slow gameplay (dog 1-3 and
+# longway)" -- Options.py's ExcludeSlowLevels toggle applies to exactly this fixed set,
+# matched by data/levels.json's own "name" field (the same real, native-numbered display
+# names used everywhere else -- see that file's own _caveats for where these particular
+# numbers/names came from). Kept as one named constant here, shared by Regions.py/
+# Rules.py/__init__.py, rather than re-listing the four names in each place.
+SLOW_LEVEL_NAMES = {"99 - Dog1", "98 - Dog2", "99 - Dog3", "32 - Longway"}
+
+
+def is_excluded(level: dict, options) -> bool:
+    """Whether this level should be left out of the location/item pools entirely, per
+    Options.py's ExcludeSlowLevels toggle. `options` is duck-typed (SuperhotOptions in
+    practice) rather than type-hinted, purely to avoid importing Options.py here -- Items.py
+    is the lowest-level module (LEVELS itself lives here), and nothing else needs it to
+    depend on Options.py back.
+    """
+    return bool(options.exclude_slow_levels.value) and level["name"] in SLOW_LEVEL_NAMES
+
 
 class ItemData(NamedTuple):
     code: Optional[int]

@@ -105,6 +105,19 @@ namespace SuperhotArchipelago.Core
                 return false;
             }
 
+            // Real, explicit user request: "a yaml setting to exclude levels with
+            // boring/slow gameplay (dog 1-3 and longway)" -- see
+            // Core/ArchipelagoConnection.cs's ExcludedLevelOrders. A level this player's
+            // own options excluded has no access item and no location in this
+            // generation at all (see apworld/superhot/Regions.py), so it can never
+            // legitimately become "unlocked" through the normal item-based path below --
+            // it's always allowed through instead, same as level 1's own special case
+            // immediately above.
+            if (Mod.Connection != null && Mod.Connection.IsLevelExcluded(entry.Order))
+            {
+                return false;
+            }
+
             if (!UnlockState.IsUnlocked(tracked.ID))
             {
                 // Real bug found by a playtest screenshot: the original, longer message here

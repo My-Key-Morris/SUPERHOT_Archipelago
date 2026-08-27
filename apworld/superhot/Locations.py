@@ -50,6 +50,12 @@ def secret_location_name(level: dict) -> str:
 # mod/SuperhotArchipelago/Core/LevelCatalog.cs's SecretLocationIdOffset.
 SECRET_LOCATION_OFFSET = 20000
 
+# Real, explicit user request: Options.py's ExcludeSlowLevels toggle removes some levels'
+# locations from a given player's own world (see Regions.py's create_regions) -- but this
+# table itself deliberately stays the full, unfiltered universe of every location this
+# game could ever have, regardless of any one player's options. That's the documented
+# Archipelago world API convention for class-level name/id tables (location_name_to_id
+# below is built straight from this), not something exclusion should ever shrink.
 location_table: dict[str, LocationData] = {
     level_location_name(level): LocationData(BASE_ID + level["order"], "Menu")
     for level in LEVELS[:-1]  # excludes the final level -- see module docstring

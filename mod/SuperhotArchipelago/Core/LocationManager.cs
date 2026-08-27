@@ -167,7 +167,14 @@ namespace SuperhotArchipelago.Core
             // sending a CompleteLocationChecks for it here would just be a check for a
             // location id the server doesn't know about. Goal completion is still
             // reported below regardless, via the separate SetGoalAchieved signal.
-            if (level.Order != LevelCatalog.Levels.Count)
+            //
+            // Real, explicit user request (ExcludeSlowLevels, see apworld/superhot/Options.py):
+            // a level this room's slot data marked excluded has no real location either --
+            // same reasoning as the final level above, just per-player-optional instead of
+            // universal. LevelAccessGuard.cs already treats an excluded level as always
+            // unlocked, so this only ever skips a check that was never possible to send in
+            // the first place, not one the player was blocked from making.
+            if (level.Order != LevelCatalog.Levels.Count && !_connection.IsLevelExcluded(level.Order))
             {
                 long locationId = LevelCatalog.BaseId + level.Order;
 
@@ -249,6 +256,16 @@ namespace SuperhotArchipelago.Core
                 _log.Warning($"Secret found in '{level.DisplayName}', but levels.json says this level " +
                               "has none -- sending the check anyway, but this likely means levels.json's " +
                               "hasSecret is out of sync with the real game.");
+            }
+
+            // Real, explicit user request (ExcludeSlowLevels, see apworld/superhot/Options.py):
+            // an excluded level's secret location doesn't exist in this room either (see
+            // CheckLocation's own matching check) -- nothing to send a check for.
+            if (_connection.IsLevelExcluded(level.Order))
+            {
+                _log.Msg($"'{level.DisplayName}' secret found, but this level is excluded from " +
+                    "tracking (ExcludeSlowLevels) -- no check to send.");
+                return;
             }
 
             long locationId = LevelCatalog.BaseId + LevelCatalog.SecretLocationIdOffset + level.Order;
@@ -418,6 +435,18 @@ namespace SuperhotArchipelago.Core
                 return UnlockState.IsUnlocked(levelId);
             }
 
+            // Real, explicit user request (ExcludeSlowLevels): same reasoning as the final
+            // level above -- an excluded level has no completion location to read here
+            // either (see CheckLocation), so there's no server-authoritative "completed"
+            // signal for it. LevelAccessGuard.cs already always unlocks it, so treating it
+            // as completed too keeps HubUnlockPatch.cs showing it white/normal rather than
+            // permanently grey ("unlocked but never played") for a level that was never a
+            // real check to begin with.
+            if (_connection.IsLevelExcluded(level.Order))
+            {
+                return true;
+            }
+
             long locationId = LevelCatalog.BaseId + level.Order;
             return _connection.Session.Locations.AllLocationsChecked.Contains(locationId);
         }
@@ -451,6 +480,15 @@ namespace SuperhotArchipelago.Core
                 return false;
             }
 
+            // Real, explicit user request (ExcludeSlowLevels): an excluded level's secret
+            // location doesn't exist either (see CheckSecretLocation's own matching
+            // guard) -- same "always show completed, never grey" reasoning as
+            // IsLevelCompleted above, just for the secret badge instead of the main one.
+            if (_connection.IsLevelExcluded(level.Order))
+            {
+                return true;
+            }
+
             long locationId = LevelCatalog.BaseId + LevelCatalog.SecretLocationIdOffset + level.Order;
             return _connection.Session.Locations.AllLocationsChecked.Contains(locationId);
         }
@@ -471,6 +509,16 @@ namespace SuperhotArchipelago.Core
             foreach (LevelEntry level in LevelCatalog.Levels)
             {
                 if (level.Order == LevelCatalog.Levels.Count)
+                {
+                    continue;
+                }
+
+                // Real, explicit user request (ExcludeSlowLevels): an excluded level was
+                // never a real check the player could send in the first place (see
+                // CheckLocation) -- it shouldn't count toward Free's "other levels
+                // completed" requirement any more than Free's own play counts toward
+                // itself, immediately above.
+                if (_connection.IsLevelExcluded(level.Order))
                 {
                     continue;
                 }

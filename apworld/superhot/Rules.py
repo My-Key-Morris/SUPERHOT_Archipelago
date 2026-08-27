@@ -30,12 +30,18 @@ Reaching every other level's own location never depends on Free in any way, so t
 generator can't create a deadlock by not knowing about it -- it's purely a real-time gate
 the mod itself enforces during play, not something Archipelago's own reachability logic
 needs to reason about. See mod/SuperhotArchipelago/Core/LevelAccessGuard.cs.
+
+Real, explicit user request: Options.py's ExcludeSlowLevels toggle removes a level's
+location(s) from this player's world entirely (see Regions.py) -- is_excluded() below
+skips those the same way the loop already skips level 1, since there's no location left to
+set a rule on at all (multiworld.get_location() would raise for one that was never
+created).
 """
 from __future__ import annotations
 
 from worlds.generic.Rules import set_rule
 
-from .Items import LEVELS, level_item_name
+from .Items import LEVELS, is_excluded, level_item_name
 from .Locations import level_location_name, secret_location_name
 from .Regions import VICTORY_LOCATION_NAME
 
@@ -46,6 +52,8 @@ def set_rules(world) -> None:
 
     for level in LEVELS:
         if level["order"] == 1:
+            continue
+        if is_excluded(level, world.options):
             continue
 
         item_name = level_item_name(level)

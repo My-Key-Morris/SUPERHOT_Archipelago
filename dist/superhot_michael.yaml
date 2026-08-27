@@ -25,3 +25,9 @@ SUPERHOT:
   # 0-31, defaults to 25. Set to 0 to disable this and let the access item alone be
   # enough, same as every other level.
   levels_required_for_free: 25
+
+  # Removes "99 - Dog1", "98 - Dog2", "99 - Dog3", and "32 - Longway" from the item and
+  # location pools entirely -- known for slower, more repetitive gameplay than the rest
+  # of the campaign. They stay freely playable in-game, always unlocked, same as "01 -
+  # Kick" -- they just aren't part of the multiworld pool. Defaults to false.
+  exclude_slow_levels: false
