@@ -78,6 +78,15 @@ namespace SuperhotArchipelago.Core
         public static Dictionary<long, LevelEntry> LocationIdToLevel { get; private set; } = new();
         public static Dictionary<long, LevelEntry> ItemIdToLevel { get; private set; } = new();
 
+        // Reverse lookup for a level's *secret* location id (BaseId + SecretLocationIdOffset
+        // + entry.Order), distinct from LocationIdToLevel above which only covers the main
+        // completion location range. Added for the Notifications feature's history resync
+        // (Core/LocationManager.cs's OnConnected) -- given a raw checked location id from
+        // Session.Locations.AllLocationsChecked, this is what tells "the main completion
+        // check for level X" apart from "the secret check for level X" so the right log
+        // text ("Sent X" vs "Sent X Secret") can be rebuilt.
+        public static Dictionary<long, LevelEntry> SecretLocationIdToLevel { get; private set; } = new();
+
         // Kept for logging/reference only -- do NOT use this for gating decisions, see
         // LevelEntry.LevelId's comment above for why (duplicate scene names make this
         // dictionary lossy, last-one-wins). Real gating uses LevelIdToLevel instead.
@@ -114,6 +123,12 @@ namespace SuperhotArchipelago.Core
                 LocationIdToLevel[locationId] = entry;
                 ItemIdToLevel[itemId] = entry;
 
+                if (entry.HasSecret)
+                {
+                    long secretLocationId = BaseId + SecretLocationIdOffset + entry.Order;
+                    SecretLocationIdToLevel[secretLocationId] = entry;
+                }
+
                 // NOTE: because of the duplicate scene names flagged in levels.json's
                 // _caveats (e.g. "TheyAreYourTools_C_2" appearing at orders 13/16/19),
                 // this dictionary can only hold one LevelEntry per scene name -- last one
@@ -123,6 +138,31 @@ namespace SuperhotArchipelago.Core
             }
 
             log.Msg($"LevelCatalog loaded {Levels.Count} levels from '{path}'.");
+        }
+
+        /// <summary>
+        /// This mod's own short display name for an item id, if it's one we recognize
+        /// (a level access item, or the White Space filler) -- null otherwise. Real,
+        /// explicit user request: notification text (Core/LocationManager.cs's "Sent"
+        /// side) was running long enough to get truncated/cut off mid-word on the AP
+        /// LOG screen -- the AP-side item name for a level access item includes a
+        /// "Level Access: " prefix (apworld/superhot/Items.py) that's redundant once
+        /// it's already shown as a "Sent"/"Received" line, so this trades that prefix
+        /// for this mod's own already-short LevelEntry.DisplayName ("29 - Train"
+        /// instead of "Level Access: 29 - Train") -- same "prefer our own catalog name
+        /// over AP's own dynamically-fetched one" preference already used everywhere
+        /// else in this codebase (e.g. Core/ItemManager.cs's ApplyItem). Callers should
+        /// fall back to the AP-provided name (e.g. ScoutedItemInfo.ItemDisplayName) when
+        /// this returns null -- covers Victory or any item outside our own catalog.
+        /// </summary>
+        public static string? TryGetShortItemDisplayName(long itemId)
+        {
+            if (itemId == WhiteSpaceItemId)
+            {
+                return "White Space";
+            }
+
+            return ItemIdToLevel.TryGetValue(itemId, out LevelEntry? level) ? level.DisplayName : null;
         }
     }
 }

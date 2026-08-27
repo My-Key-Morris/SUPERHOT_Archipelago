@@ -202,6 +202,17 @@ namespace SuperhotArchipelago.Core
             // it's safe to touch Unity/game state.
             Items?.ProcessQueue();
 
+            // Scout results (see LocationManager.cs's own comment on _pendingNotifications)
+            // resolve off Unity's main thread -- this is what turns them into real
+            // NotificationLog entries on the main thread, same shape as Items.ProcessQueue()
+            // above.
+            Locations?.ProcessPendingNotifications();
+
+            // See NotificationLog.cs's own comment on _pendingPopups for why popups
+            // aren't dispatched the instant they're queued -- this is what actually
+            // flushes them once it's safe to.
+            NotificationLog.FlushPendingPopups();
+
             // Real bug report: the hub's ARCHIPELAGO button sometimes showed OFFLINE while
             // actually connected -- its label is only recomputed once, when the hub's root
             // view is built (see Patches/ConnectionButtonPatch.cs's Round 17 doc for why
@@ -257,6 +268,48 @@ namespace SuperhotArchipelago.Core
                 LoggerInstance.Msg("Found 'storyFinished' already true on disk (likely saved before this " +
                     "mod suppressed it) -- resetting to false so the hub's per-level lock pass can run again.");
                 SaveManager.Instance.SetValue("storyFinished", false);
+            }
+
+            // Real bug report: SUPERHOT's own "all secrets found" Steam achievement
+            // (TerminalActivator.CheckAllSecretsAchievement(), confirmed via decompile)
+            // kept firing on nearly every new secret found this run, despite the player
+            // genuinely not having found all of them in this Archipelago run. Root
+            // cause, confirmed via decompile of TerminalActivator.OnActivate and
+            // LevelInfo.SecretsFound: that check reads each of the game's 34 levels' own
+            // native per-secret save flag (SceneFileName + "1unlocked" -- "1" because
+            // every level has either 0 or 1 secrets, never more, see
+            // LevelCatalog.LevelEntry.HasSecret's own comment) directly, completely
+            // independent of Archipelago's own tracking. On a save file with a long
+            // testing history (same root problem as the storyFinished fix above), most
+            // of those flags were already true from earlier playthroughs unrelated to
+            // the current AP run, so finding almost any new secret this run made the
+            // native "all levels' own flags happen to be true" check pass by accident.
+            // The hub's own "CRACKED!" badge already ignores these stale flags entirely
+            // (Patches/HubUnlockPatch.cs reads LocationManager.IsSecretCompleted()
+            // instead of trusting them) -- but this native achievement check isn't
+            // something the mod patches at all, so nothing was correcting the
+            // underlying save data it reads. Fixed the same way as storyFinished:
+            // actively resync every tracked secret-bearing level's native flag to match
+            // IsSecretCompleted() on every scene load (both directions -- also fixes a
+            // secret genuinely checked earlier in this multiworld from ever displaying
+            // as "not cracked" on a fresh local save), so this native check -- and any
+            // other native code reading the same save keys -- can never see a stale
+            // "found" state that doesn't match the current run. Safe to do unconditionally
+            // here: this only ever runs once per fresh scene load, before any in-level
+            // interaction, so it can never race with or revert a genuine find made
+            // during the level visit that's ending right as this runs.
+            if (IsEnabled && SaveManager.Instance != null && Locations != null)
+            {
+                foreach (LevelEntry entry in LevelCatalog.Levels)
+                {
+                    if (!entry.HasSecret)
+                    {
+                        continue;
+                    }
+
+                    bool actuallyCompleted = Locations.IsSecretCompleted(entry.LevelId);
+                    SaveManager.Instance.SetValue(entry.SceneName + "1unlocked", actuallyCompleted);
+                }
             }
 
             // Last-resort safety net, added after a real playtest found a level ("25 -

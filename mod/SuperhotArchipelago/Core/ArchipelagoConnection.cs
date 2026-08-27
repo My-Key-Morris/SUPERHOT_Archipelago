@@ -32,6 +32,22 @@ namespace SuperhotArchipelago.Core
         // can't quietly disagree if one is ever changed without the other.
         public int LevelsRequiredForFree { get; private set; } = 25;
 
+        // Real, explicit user request (Notifications feature): popups should only fire
+        // for genuinely new items received live during play, not for the full item
+        // history the server replays through the same ItemReceived event on every
+        // connect/reconnect (confirmed real behavior -- this is exactly why
+        // UnlockState.cs already ends up fully rebuilt after every reconnect with no
+        // extra bookkeeping). Core/ItemManager.cs uses this timestamp plus a short grace
+        // window (see its own comment) to tell that replay burst apart from a genuinely
+        // live item, rather than comparing against Session.Items.AllItemsReceived's count
+        // directly -- the client library's own docs/decompile don't pin down precisely
+        // when that collection is populated relative to TryConnectAndLogin returning vs.
+        // ItemReceived firing, and a wrong assumption there would either spam popups for
+        // old items on every reconnect or silently swallow real live ones. A short
+        // real-time grace period after a successful connect sidesteps needing that
+        // internal ordering guarantee at all.
+        public DateTime ConnectedAtUtc { get; private set; }
+
         public event Action? Connected;
 
         public ArchipelagoConnection(MelonLogger.Instance log)
@@ -109,8 +125,60 @@ namespace SuperhotArchipelago.Core
             }
 
             IsConnected = true;
+            ConnectedAtUtc = DateTime.UtcNow;
+
+            // Real, explicit user request: the notification log should reflect this
+            // slot's full history on the server, not just what happened to occur this
+            // process/connection -- see NotificationLog.cs's own class doc. Clearing
+            // here, right before Connected fires and LocationManager.cs/ItemManager.cs
+            // each rebuild their half from the server's own state, guarantees every
+            // connect (including a reconnect after toggling AP MODE) ends at a clean,
+            // correct picture rather than a stale or duplicated one.
+            NotificationLog.Clear();
+
             _log.Msg($"Connected to Archipelago as '{slotName}'.");
-            Connected?.Invoke();
+
+            // Real bug found by live testing: `Connected?.Invoke()` used to be a plain
+            // multicast delegate call. LocationManager.cs and ItemManager.cs both
+            // subscribe to this event (in that construction order, see Mod.cs's
+            // OnInitializeMelon) -- and .NET's multicast delegate invocation is NOT
+            // fault-isolated: if the FIRST subscriber's handler throws anything at all,
+            // every subscriber after it in the list is simply never invoked, with
+            // nothing forcing that exception to surface anywhere obvious. On a room
+            // with pre-existing checked locations, LocationManager.OnConnected() kicks
+            // off Session.Locations.ScoutLocationsAsync(...) for its history resync --
+            // if anything in that call's synchronous prefix throws (not yet confirmed
+            // exactly what, but plausible given it's called the instant IsConnected
+            // flips true), ItemManager.OnConnected() -- subscribed second -- would never
+            // run at all, meaning it never subscribes to Session.Items.ItemReceived,
+            // meaning the server's item-history replay never reaches UnlockState.Unlock(),
+            // leaving every level except the always-unlocked first one looking locked
+            // despite a genuinely live, correctly-connected session (explains why
+            // Session-live reads like IsSecretCompleted()'s "CRACKED!" badges stayed
+            // correct throughout -- only the replay-dependent local UnlockState was
+            // affected). A brand new room has zero already-checked locations, so
+            // LocationManager.OnConnected() hits its early return before ever calling
+            // ScoutLocationsAsync -- which is exactly why reconnecting to a fresh room
+            // "fixed" it while reconnecting to an in-progress one didn't. Invoking each
+            // subscriber individually, with its own try/catch, guarantees one
+            // subscriber's failure can never silently skip another's -- the real,
+            // general fix, not just a patch for this one call site. See
+            // LocationManager.cs/ItemManager.cs's own OnConnected for the matching
+            // defensive try/catch around each handler's body.
+            if (Connected != null)
+            {
+                foreach (Delegate handler in Connected.GetInvocationList())
+                {
+                    try
+                    {
+                        ((Action)handler)();
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.Error($"A Connected event handler threw and was skipped: {ex}");
+                    }
+                }
+            }
         }
 
         // Real, explicit user request: needed so turning Archipelago mode off

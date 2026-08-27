@@ -45,6 +45,10 @@ The goal is beating the final level, same as vanilla.
   flips between `ON` and `OFF` in one click. Off plays SUPERHOT exactly like vanilla — no
   level gating, no hub overlay — and drops any active connection; back on reconnects and
   picks up right where you left off.
+- **In-game notifications**: a short popup appears while playing whenever you receive an
+  item or send a check — nothing pops up for the batch of past items a fresh connection
+  replays, only for genuinely new activity. An `AP LOG` icon opens a scrollable history of
+  everything received and sent this run, for anything you missed or want to look back on.
 - The hub's native lock logic only supports two states (sequential-up-to-highest-finished,
   or everything unlocked) — a layer on top tracks Archipelago's own out-of-order unlocks
   without replacing that native logic.
