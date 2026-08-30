@@ -1,10 +1,11 @@
 """Coverage for Options.py's ExcludeSlowLevels toggle.
 
 Real, explicit user request: "I want a yaml setting to exclude levels with boring/slow
-gameplay (dog 1-3 and longway)". Two things need checking: with the option off, nothing
-about the world changes from before this feature existed (every slow level still has its
-usual location(s)/item, exactly as if the option didn't exist at all); with it on, all
-four are gone from both pools entirely, and the item/location counts still balance.
+gameplay (dog 1-3 and longway)", later followed up with "boring levels add 22 - hacker" to
+add a fifth. Two things need checking: with the option off, nothing about the world changes
+from before this feature existed (every slow level still has its usual location(s)/item,
+exactly as if the option didn't exist at all); with it on, all five are gone from both
+pools entirely, and the item/location counts still balance.
 """
 from __future__ import annotations
 
@@ -15,7 +16,7 @@ from .bases import SuperhotTestBase
 
 def _slow_levels() -> list[dict]:
     slow = [level for level in LEVELS if level["name"] in SLOW_LEVEL_NAMES]
-    assert len(slow) == 4, "expected exactly the four levels ExcludeSlowLevels documents"
+    assert len(slow) == 5, "expected exactly the five levels ExcludeSlowLevels documents"
     return slow
 
 
@@ -39,7 +40,7 @@ class TestExclusionOff(SuperhotTestBase):
 
 
 class TestExclusionOn(SuperhotTestBase):
-    """exclude_slow_levels on -- all four are gone from both pools, and the item/location
+    """exclude_slow_levels on -- all five are gone from both pools, and the item/location
     counts still balance (Fill would otherwise raise FillError -- see test_filler.py's own
     docstring for why nothing pads this automatically)."""
 
@@ -68,7 +69,7 @@ class TestExclusionOn(SuperhotTestBase):
         self.assertEqual(len(self.multiworld.itempool), real_location_count)
 
     def test_other_levels_unaffected(self) -> None:
-        """Excluding the four slow levels shouldn't touch any other level's own
+        """Excluding the five slow levels shouldn't touch any other level's own
         location/item -- a real, explicit implicit expectation worth asserting directly
         rather than just inferring it from the count-based tests above."""
         for level in LEVELS:

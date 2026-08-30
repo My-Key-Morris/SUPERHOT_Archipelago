@@ -53,7 +53,7 @@ LEVELS = json.loads(_raw_levels_json)["levels"]
 # names used everywhere else -- see that file's own _caveats for where these particular
 # numbers/names came from). Kept as one named constant here, shared by Regions.py/
 # Rules.py/__init__.py, rather than re-listing the four names in each place.
-SLOW_LEVEL_NAMES = {"99 - Dog1", "98 - Dog2", "99 - Dog3", "32 - Longway"}
+SLOW_LEVEL_NAMES = {"99 - Dog1", "98 - Dog2", "99 - Dog3", "32 - Longway", "22 - Hacker"}
 
 
 def is_excluded(level: dict, options) -> bool:
