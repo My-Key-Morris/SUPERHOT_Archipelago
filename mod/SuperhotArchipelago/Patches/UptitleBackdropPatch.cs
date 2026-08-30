@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using HarmonyLib;
 
 namespace SuperhotArchipelago.Patches
@@ -81,20 +82,34 @@ namespace SuperhotArchipelago.Patches
     /// off-screen -- confirmed live: only a sliver of text/backdrop remained visible, cut into
     /// fragments. Re-centers uptitleSHGUI here using GetLongestLineLength() (a real line width,
     /// ignoring newlines) instead, right after the native method (and its bad centering) runs.
+    /// SetUptitle(LocalizableText, ...) is static, so -- unlike UptitleBackdropPatch's Postfix
+    /// above -- Harmony's "___uptitleSHGUI" field-injection isn't valid here (it only binds an
+    /// instance field through an implicit "this", which a static method doesn't have; using it
+    /// anyway produced no error at patch time but broke button clicks the first time this ran,
+    /// confirmed live). Reads the field directly off TextManager.THIS via reflection instead,
+    /// the same AccessTools.Field pattern HubUnlockPatch.cs already uses for the same reason.
     /// </summary>
     [HarmonyPatch(typeof(TextManager), nameof(TextManager.SetUptitle),
         new[] { typeof(LocalizableText), typeof(bool), typeof(bool), typeof(bool) })]
     public static class UptitleCenteringPatch
     {
-        public static void Postfix(SHGUItext ___uptitleSHGUI)
+        private static readonly FieldInfo UptitleSHGUIField =
+            AccessTools.Field(typeof(TextManager), "uptitleSHGUI");
+
+        public static void Postfix()
         {
-            if (___uptitleSHGUI == null)
+            if (TextManager.THIS == null)
             {
                 return;
             }
 
-            int longestLine = ___uptitleSHGUI.GetLongestLineLength();
-            ___uptitleSHGUI.x = SHGUI.current.resolutionX / 2 - longestLine / 2 + 1;
+            if (UptitleSHGUIField.GetValue(TextManager.THIS) is not SHGUItext uptitleSHGUI)
+            {
+                return;
+            }
+
+            int longestLine = uptitleSHGUI.GetLongestLineLength();
+            uptitleSHGUI.x = SHGUI.current.resolutionX / 2 - longestLine / 2 + 1;
         }
     }
 }
