@@ -3,53 +3,21 @@ using UnityEngine;
 namespace SuperhotArchipelago.Core
 {
     /// <summary>
-    /// Real, explicit user follow-up to Rounds 11-13: not just a hub button, but a
-    /// genuinely native-styled connection screen -- "actually in the game... like how the
-    /// settings are" -- instead of a Unity IMGUI window floating on top of everything.
+    /// Native in-game connection screen (server/slot/password) built on SHGUIappbase,
+    /// replacing the old Unity IMGUI popup (Core/ConnectionUI.cs). Text entry mirrors
+    /// AppSHConsole's own pattern (Input.inputString, backspace/enter handling, blinking
+    /// caret) across three Tab-cycled fields instead of one.
     ///
-    /// This replaces Core/ConnectionUI.cs entirely (removed, along with
-    /// Patches/ConnectionCursorPatch.cs -- that whole cursor-visibility fight goes away by
-    /// construction once nothing here needs a mouse). Built on the game's own real "app
-    /// screen" framework instead of Unity IMGUI:
-    ///
-    /// - SHGUIappbase (confirmed via decompile) is the base every simple bordered pop-up
-    ///   app screen uses -- it already draws a frame, a title label, and an "Esc" hint, and
-    ///   already handles Escape-to-close. Free UI chrome, no need to reinvent it.
-    /// - SHGUItext (confirmed via decompile) is the game's own positioned, colored text
-    ///   widget -- the same primitive every hub label/status string already uses.
-    /// - Free-text keyboard entry has a real, working precedent in this exact game:
-    ///   AppSHConsole (the native dev console, confirmed via decompile) accumulates typed
-    ///   characters every frame via Input.inputString, manually strips backspace ('\b') and
-    ///   submits on carriage return ('\r'), and draws a blinking caret with
-    ///   Mathf.Sin(Time.realtimeSinceStartup * 10f). This class reuses that exact pattern
-    ///   for three fields instead of AppSHConsole's one, with Tab cycling which field is
-    ///   focused (SHGUItext.color, inherited from SHGUIview, is a plain settable field --
-    ///   used here to make only the focused field's label white, others grey, same 'w'/'z'
-    ///   convention as everywhere else in this mod).
-    /// - Launched directly via SHGUI.current.AddViewOnTop(new ArchipelagoConnectApp()) from
-    ///   Patches/ConnectionButtonPatch.cs's button -- confirmed via decompile this is the
-    ///   same general mechanism SHGUI.LaunchAppByName uses internally, no name-registration
-    ///   system required to use it directly.
-    ///
-    /// Deliberately overrides ReactToInputKeyboard to swallow "enter" (SHGUIappbase's own
-    /// version treats Enter as "close the app", which would fight this screen's own use of
-    /// Enter to advance between fields/submit) while still forwarding "esc" to close, same
-    /// as every other app screen in the game.
-    ///
-    /// Real bug found by playtesting: forwarding "esc" through ReactToInputKeyboard alone
-    /// wasn't enough -- Escape didn't close the screen. Update() below now also reads
-    /// Input.GetKeyDown(KeyCode.Escape) directly and closes via SHGUI.current.PopView(),
-    /// matching how AppSHConsole itself handles Escape (it doesn't trust the enum-dispatch
-    /// path alone either, despite inheriting the same SHGUIappbase machinery). The
-    /// ReactToInputKeyboard override is kept as a harmless backup, not the real fix.
+    /// ReactToInputKeyboard swallows "enter" so the base class doesn't treat it as "close
+    /// app" (this screen uses Enter to advance fields/submit instead), while "esc" is still
+    /// forwarded. Update() also reads Escape directly since the ReactToInputKeyboard path
+    /// alone didn't reliably close the screen.
     /// </summary>
     public class ArchipelagoConnectApp : SHGUIappbase
     {
         private const int FieldCount = 3;
 
-        // Kept comfortably under the app frame's real width (AppSHConsole's own
-        // user-visible line-wrap width is 59, for reference) for margin rather than
-        // measured exactly against SHGUI.current.resolutionX.
+        // Kept under the app frame's real width for margin, not measured exactly.
         private const int StatusLineWidth = 50;
 
         private readonly SHGUItext[] _labels = new SHGUItext[FieldCount];
@@ -87,15 +55,8 @@ namespace SuperhotArchipelago.Core
         {
             base.Update();
 
-            // Real bug found by playtesting: Esc didn't close this screen. Root cause --
-            // SHGUIappbase.ReactToInputKeyboard (which this class forwards "esc" to, see
-            // below) apparently isn't a reliable path for this class, at least not on its
-            // own. Real, working precedent for exactly that: AppSHConsole (the game's own
-            // native dev console, confirmed via decompile) doesn't rely on that dispatch
-            // for Escape either -- it reads Input.GetKeyDown(KeyCode.Escape) directly every
-            // frame and closes itself that way, even though it inherits the same
-            // ReactToInputKeyboard machinery. Matching that same proven pattern here
-            // instead of trusting the enum-dispatch path alone.
+            // ReactToInputKeyboard's "esc" dispatch alone doesn't reliably close this
+            // screen, so Escape is also read directly here, same pattern AppSHConsole uses.
             if (Input.GetKeyDown(KeyCode.Escape))
             {
                 SHGUI.current.PopView();
@@ -114,8 +75,8 @@ namespace SuperhotArchipelago.Core
                 buffer += Input.inputString;
             }
 
-            // Same two passes AppSHConsole uses: strip backspaces first (each '\b' also
-            // removes the character before it), then look for a submitted line ('\r').
+            // Same two passes AppSHConsole uses: strip backspaces first, then look for a
+            // submitted line ('\r').
             for (int i = 0; i < buffer.Length; i++)
             {
                 if (buffer[i] == '\b')
@@ -164,8 +125,8 @@ namespace SuperhotArchipelago.Core
                 base.ReactToInputKeyboard(key);
             }
 
-            // Deliberately not forwarding "enter" -- see class docstring. This screen
-            // handles it directly in Update() instead of letting the base class close on it.
+            // Enter isn't forwarded -- see class summary; Update() handles it directly
+            // instead of letting the base class close on it.
         }
 
         private void Connect()
@@ -187,12 +148,8 @@ namespace SuperhotArchipelago.Core
                 _values[i].text = shown + (focused ? caret : "");
             }
 
-            // Real bug found by playtesting: a long status message (e.g. a real connection
-            // error) ran straight off the right edge of the app frame instead of wrapping.
-            // SHGUItext.BreakTextForLineLength (confirmed via decompile -- it just inserts
-            // '\n' into .text wherever a line would exceed the given length, same primitive
-            // AppSHConsole's own multi-line output uses) fixes that directly; StatusLineWidth
-            // is set well under the frame's real width for margin, not measured exactly.
+            // Long status messages (e.g. connection errors) would otherwise run off the
+            // frame edge; BreakTextForLineLength inserts newlines to wrap them.
             _statusField.text = "STATUS: " + StatusText();
             _statusField.BreakTextForLineLength(StatusLineWidth);
         }

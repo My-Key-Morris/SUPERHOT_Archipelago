@@ -4,38 +4,14 @@ using SuperhotArchipelago.Core;
 namespace SuperhotArchipelago.Patches
 {
     /// <summary>
-    /// Real bug found by a playtest: "32 - Longway" never sent a check on completion.
-    /// Root cause, confirmed by decompiling LevelFlowControl.cs: not every level ends
-    /// through the normal "kill all -> ending fade -> click to continue" flow that
-    /// LevelCompletePatch.cs listens to (LevelSetup.UnlockNextLevel()). Some levels
-    /// instead end with a smooth, scripted "no hub visit" transition straight into the
-    /// next level -- LevelFlowControl.LoadNextLevel() and its four siblings below --
-    /// which never call UnlockNextLevel() at all. For those levels, our only completion
-    /// signal was simply never firing. Sending here is intentionally unconditional and
-    /// independent of LevelCompletePatch -- if a level happens to trigger both paths, the
-    /// server just sees a harmless duplicate (CompleteLocationChecks is idempotent).
-    ///
-    /// Second real bug, found on the very next playtest: blocking the *inner* launch call
-    /// (ViaAppGatePatch/LevelGatePatch, both several calls deep inside these methods,
-    /// invoked ~0.1-0.4s later via DelayedInvokeMarshal) was too late. By the time that
-    /// inner call runs, these outer methods have already synchronously kicked off their
-    /// camera-glitch/static/audio transition effects -- confirmed by decompiling
-    /// LevelFlowControl.cs, e.g. CameraEffectsManager.Instance["HotswitchRealtime"].Play(...)
-    /// and the AppHotswitch overlay fill both happen immediately, only the actual level
-    /// launch is deferred. Blocking just the deferred part left the player stuck in that
-    /// half-finished static effect with no real level ever loading under it -- for most
-    /// levels apparently escapable by pressing Escape (not something this mod does), but
-    /// for "14 - Serv" specifically, not escapable at all, a real soft-lock.
-    ///
-    /// Fixed by gating here too, *before* any of that starts: Prefix now checks what
-    /// LevelSetup.GetNextLevelInfo() would be and blocks the entire method outright (skip
-    /// with no camera/audio effects ever triggered) if it's not allowed, redirecting to
-    /// the hub immediately instead of leaving anything mid-transition. The four
-    /// Status-returning methods share a private `loadedNextLevel` field (confirmed via
-    /// decompile) that normally guards their real work against repeated per-frame calls;
-    /// since skipping the method means that field never gets set by the original code, we
-    /// set it ourselves when blocking so the behavior-tree node doesn't keep re-entering
-    /// and re-triggering our redirect every frame.
+    /// Some levels end via a scripted "no hub visit" transition (LoadNextLevel and its
+    /// siblings) that never calls UnlockNextLevel(), so LevelCompletePatch's completion
+    /// signal never fires for them -- this reports completion here too (harmless
+    /// duplicate if both paths fire, since CompleteLocationChecks is idempotent). Gating
+    /// must happen in this Prefix, before camera/audio transition effects start
+    /// synchronously; blocking only the deferred inner launch call leaves the player
+    /// stuck mid-transition with no level loaded. Also manually sets `loadedNextLevel`
+    /// when blocking, since skipping the method means the original code never sets it.
     /// </summary>
     internal static class AutoTransitionCheck
     {
@@ -46,11 +22,8 @@ namespace SuperhotArchipelago.Patches
                 return;
             }
 
-            // Real, explicit user request: Archipelago mode can be turned off entirely to
-            // play vanilla (see Mod.IsEnabled/Patches/ArchipelagoModeTogglePatch.cs) --
-            // same reasoning as LevelCompletePatch.cs/SecretFoundPatch.cs for skipping the
-            // report attempt entirely rather than relying on CheckLocation's own
-            // not-connected guard.
+            // Skip entirely when AP mode is off, so vanilla play doesn't trigger a
+            // misleading "not connected" warning.
             if (!Mod.IsEnabled)
             {
                 return;
@@ -165,10 +138,8 @@ namespace SuperhotArchipelago.Patches
         public static bool Prefix()
         {
             AutoTransitionCheck.ReportCompletionIfFirstCall(false);
-            // No loadedNextLevel-style guard exists on this one (confirmed via
-            // decompile -- its body has no such check), and unlike the four Status-
-            // returning siblings above it isn't a polled behavior-tree node, so there's
-            // no repeated-call risk to guard against here.
+            // This method has no loadedNextLevel-style guard and isn't polled repeatedly
+            // like the four siblings above, so no repeated-call guard is needed here.
             return !AutoTransitionCheck.TryBlockAndRedirect();
         }
     }

@@ -1,13 +1,6 @@
-"""Item definitions for the SUPERHOT Archipelago world.
-
-v0 design: one progressive "Level Access" item per story level (see data/levels.json),
-plus a single Victory event item on the final level, plus a single filler item ("White
-Space", see below) used to pad the pool out to match the real location count (see
-__init__.py's create_items -- location count grew past item count once secret locations
-were added, and Archipelago doesn't pad this automatically). There is no persistent
-inventory in vanilla SUPERHOT, so there's no natural "junk" item pool to draw real content
-from yet -- once mod-side research confirms what's moddable in-level (e.g. weapon crate
-contents), this will likely grow into real, distinct filler items.
+"""Item definitions for the SUPERHOT Archipelago world: one "Level Access" item per story
+level, a Victory event item, and a single filler item ("White Space") padding the pool
+out to match the real location count.
 """
 from __future__ import annotations
 
@@ -17,51 +10,28 @@ from typing import NamedTuple, Optional
 
 from BaseClasses import Item, ItemClassification
 
-# Just an arbitrary starting point, not a maintainer-assigned range -- confirmed against
-# Archipelago's own docs (docs/world api.md's Locations/Items sections) that item/location
-# ids only need to be unique *within this world's own tables*, not globally across every
-# game in a multiworld; other games' worlds can and do reuse the same raw numbers with zero
-# conflict, since the server always resolves an id by (game, id), never by id alone. This
-# used to be a real, global-uniqueness requirement in older Archipelago versions, which is
-# why offsetting from a large arbitrary base is still such a common pattern across worlds --
-# it's harmless legacy convention here, not something correctness depends on.
+# Arbitrary base -- item/location ids only need to be unique within this world's own
+# tables, not globally, but offsetting from a large base is common convention anyway.
 BASE_ID = 3891000
 
-# Items and locations are separate id namespaces in Archipelago -- a location and an item
-# are allowed to numerically share a code without colliding -- but giving them distinct
-# ranges avoids any confusion (both on the mod side, which needs to map codes back to
-# levels, and for anyone reading logs/spoilers) about which "3891005" is being discussed.
-# Locations.py uses BASE_ID directly; items use this offset range instead.
+# Items and locations are separate id namespaces; this offset just avoids confusion (e.g.
+# in logs/spoilers) between an item and a location that happen to share a numeric code.
 ITEM_ID_OFFSET = 10000
 
-# pkgutil.get_data (not plain pathlib file I/O) is required here: when this world is
-# distributed as a packaged .apworld, it's a zip file that gets imported via zipimport,
-# and there's no real filesystem directory for Path(__file__).parent to point at --
-# "NotADirectoryError: [Errno 20] Not a directory" trying to open a path through the zip.
-# get_data() goes through the same import machinery Python used to load this module in
-# the first place, so it works identically whether superhot/ is a loose folder or the
-# inside of a zip. Confirmed by actually building this world with the Launcher's "Build
-# APWorlds" component and generating from the resulting .apworld -- pathlib failed there,
-# get_data() doesn't.
+# pkgutil.get_data (not pathlib) is required here since a packaged .apworld is a zip
+# imported via zipimport, with no real filesystem directory to open a path against.
 _raw_levels_json = pkgutil.get_data(__name__, "data/levels.json")
 assert _raw_levels_json is not None, "data/levels.json missing from the superhot world package"
 LEVELS = json.loads(_raw_levels_json)["levels"]
 
-# Real, explicit user request: "exclude levels with boring/slow gameplay (dog 1-3 and
-# longway)" -- Options.py's ExcludeSlowLevels toggle applies to exactly this fixed set,
-# matched by data/levels.json's own "name" field (the same real, native-numbered display
-# names used everywhere else -- see that file's own _caveats for where these particular
-# numbers/names came from). Kept as one named constant here, shared by Regions.py/
-# Rules.py/__init__.py, rather than re-listing the four names in each place.
+# ExcludeSlowLevels' fixed set of slow/disruptive levels, matched by levels.json's "name".
 SLOW_LEVEL_NAMES = {"99 - Dog1", "98 - Dog2", "99 - Dog3", "32 - Longway", "22 - Hacker"}
 
 
 def is_excluded(level: dict, options) -> bool:
-    """Whether this level should be left out of the location/item pools entirely, per
-    Options.py's ExcludeSlowLevels toggle. `options` is duck-typed (SuperhotOptions in
-    practice) rather than type-hinted, purely to avoid importing Options.py here -- Items.py
-    is the lowest-level module (LEVELS itself lives here), and nothing else needs it to
-    depend on Options.py back.
+    """Whether ExcludeSlowLevels removes this level from the location/item pools.
+    `options` is duck-typed to avoid Items.py (the lowest-level module) depending on
+    Options.py.
     """
     return bool(options.exclude_slow_levels.value) and level["name"] in SLOW_LEVEL_NAMES
 
@@ -75,15 +45,8 @@ def level_item_name(level: dict) -> str:
     return f"Level Access: {level['name']}"
 
 
-# Real, explicit user request: level 1 ("01 - Kick") is always reachable with no items
-# (see Rules.py -- its location has no access rule), so a "Level Access: 01 - Kick" item
-# would do nothing when received -- UnlockState.Unlock() on a level LevelAccessGuard
-# already always lets through regardless. Used to still exist anyway, classified
-# "useful" rather than "progression", purely to keep one named item per level; changed
-# to not exist at all -- its location's slot in the pool is filled by one more White
-# Space filler instead (see __init__.py's create_items) -- so nothing shows up in a
-# receive log that turns out to be a no-op. Every level from here on (LEVELS[1:]) is a
-# real progression item; level 1's entry is deliberately absent from item_table.
+# Level 1 has no access rule (always reachable), so it gets no item at all -- its pool
+# slot is filled by an extra White Space filler instead (see __init__.py's create_items).
 item_table: dict[str, ItemData] = {
     level_item_name(level): ItemData(
         BASE_ID + ITEM_ID_OFFSET + level["order"], ItemClassification.progression
@@ -95,14 +58,9 @@ item_table: dict[str, ItemData] = {
 # Event item signalling the game has been beaten (final level completed).
 item_table["Victory"] = ItemData(None, ItemClassification.progression)
 
-# The pool's filler item -- see the module docstring for why this exists and NOTES.md's
-# "filler" round for the bug that made it necessary. Named for SUPERHOT's own aesthetic
-# (every level is a stark white void the player fights through -- see the game's own
-# loading/menu screens) rather than "Level Access: X", so a player receiving several of
-# these doesn't mistake them for real level unlocks in their receive log. Id offset (100)
-# is well clear of the real level orders (1-32, and not expected to grow anywhere near
-# that high), so it can never collide with a real level's item id even if more levels are
-# added later. MUST be kept in sync by hand with
+# The pool's one filler item, named for SUPERHOT's own white-void aesthetic rather than
+# "Level Access: X" so it can't be mistaken for a real unlock. Id offset (100) stays well
+# clear of real level orders (1-32). MUST be kept in sync by hand with
 # mod/SuperhotArchipelago/Core/LevelCatalog.cs's WhiteSpaceItemId.
 WHITE_SPACE_ITEM_NAME = "White Space"
 WHITE_SPACE_ITEM_ID_OFFSET = 100

@@ -3,16 +3,10 @@ using HarmonyLib;
 namespace SuperhotArchipelago.Patches
 {
     /// <summary>
-    /// One of three progression gates -- see Core/LevelAccessGuard.cs for the shared
-    /// unlock check, and ViaAppGatePatch.cs / DirectLevelSkipPatch.cs for the other two.
-    /// A real playtest proved a single gate here wasn't enough: SUPERHOT has multiple
-    /// independent ways to actually start a level (the hub's per-level buttons and the
-    /// single "superhot.exe" shortcut both funnel through
-    /// SHGUI.LaunchLevelAppTunnels(LevelInfo, bool, bool), confirmed by reading
-    /// piOsMenu.PrepareLevelCommanderButtonForLevel() -- but level-to-level auto-continue
-    /// transitions (LevelFlowControl.LoadNextLevel() and friends) go through a
-    /// *different* method, SHGUI.LaunchLevelViaApp(LevelInfo, float), entirely bypassing
-    /// this patch. Gating all the real entry points needed all three patches.
+    /// One of three progression gates (see Core/LevelAccessGuard.cs for the shared check,
+    /// and ViaAppGatePatch.cs / DirectLevelSkipPatch.cs for the other two). This one guards
+    /// SHGUI.LaunchLevelAppTunnels, used by the hub buttons and "superhot.exe" shortcut;
+    /// auto-continue transitions use a different method, hence the other two patches.
     /// </summary>
     [HarmonyPatch(typeof(SHGUI), nameof(SHGUI.LaunchLevelAppTunnels), typeof(LevelInfo), typeof(bool), typeof(bool))]
     public static class LevelGatePatch

@@ -12,88 +12,49 @@ namespace SuperhotArchipelago.Core
         public string SceneName = "";
         public string DisplayName = "";
 
-        // Real bug found by an actual playthrough: several of these levels reuse the
-        // same Unity scene for genuinely different story beats (see the _caveats in
-        // data/levels.json -- "piCyberSpace#1_E" x2, "LevelTest#77 HackerRoom" x2,
-        // "TheyAreYourTools_C_2" x3), so SceneName above cannot be used to uniquely
-        // identify a level at runtime -- looking it up would silently resolve to
-        // whichever duplicate happened to load last. LevelId fixes this: it mirrors the
-        // real game's own LevelInfo.ID, which LevelSetup.LoadStoryLevels() assigns as a
-        // straight index into the Story/Level XML in document order (confirmed by
-        // decompiling LevelSetup.cs: AddLevelInfo(list[i], i)) -- i.e. genuinely unique
-        // per level instance, duplicates included, and stable across runs.
-        //
-        // NOT "Order - 1". A real playtest proved that formula wrong -- completing
-        // "Kick" (order 1) reported as "Dark Alley Complete" (order 2), and unlocking
-        // "Cage Fight" (order 8) visually lit up "Jump" (order 6) in the hub instead.
-        // Root cause, confirmed by extracting the real GameData Story/Level XML directly
-        // (it's stored as plain readable text inside SH_Data/resources.assets): the
-        // real document has 49 <Level> elements total, not our 34 -- LoadStoryLevels()
-        // assigns IDs over ALL of them with no filtering, including "SHMenu" and many
-        // "_SEGWAYSTUB" dialogue-interlude entries we deliberately exclude from our own
-        // catalog. That makes the real ID sequence skip around relative to our 1-34
-        // order, sometimes by several positions. LevelId below is read directly from
-        // levels.json's "gameId" field (the real extracted index for each entry), not
-        // computed, specifically so this can never silently drift out of sync again.
+        // Several levels reuse the same Unity scene for different story beats, so SceneName
+        // can't uniquely identify a level at runtime. LevelId mirrors the real game's
+        // LevelInfo.ID instead (a stable per-instance index), read directly from levels.json's
+        // "gameId" field rather than computed as "Order - 1", since the real Story/Level XML
+        // has 49 entries (including SHMenu and segway-stub interludes we exclude), so the ID
+        // sequence doesn't line up with our 1-34 order.
         public int LevelId;
 
-        // Whether this level has an in-level secret console (TerminalActivator,
-        // confirmed via decompile). Extracted from the real game's own data -- every
-        // level has either 0 or 1, never more (see levels.json's _source note) -- so
-        // this is a plain bool rather than a count.
+        // Whether this level has an in-level secret console (TerminalActivator). Every level
+        // has either 0 or 1, never more, so this is a plain bool rather than a count.
         public bool HasSecret;
     }
 
     /// <summary>
-    /// Loads data/levels.json (shipped next to the mod DLL -- copy of
-    /// apworld/superhot/data/levels.json) and reproduces the same id scheme the Python
-    /// world uses in Items.py/Locations.py, so this mod can compute the same location
-    /// and item codes without a second source of truth for the numbers themselves.
-    ///
-    /// IMPORTANT: BASE_ID and ITEM_ID_OFFSET below MUST be kept in sync by hand with
-    /// apworld/superhot/Items.py -- there's no automated check tying the Python and C#
-    /// copies together. If those ever drift, checks/items will silently map to the wrong
-    /// level.
+    /// Loads data/levels.json (a copy of apworld/superhot/data/levels.json) and reproduces
+    /// the same id scheme the Python world uses in Items.py/Locations.py.
+    /// BaseId and ItemIdOffset below MUST be kept in sync by hand with apworld/superhot/Items.py --
+    /// no automated check ties the two together, and drift silently maps checks/items to the wrong level.
     /// </summary>
     public static class LevelCatalog
     {
         public const long BaseId = 3891000;
         public const long ItemIdOffset = 10000;
 
-        // MUST be kept in sync by hand with apworld/superhot/Locations.py's
-        // SECRET_LOCATION_OFFSET -- a secret location's real Archipelago id is
-        // BaseId + SecretLocationIdOffset + entry.Order, distinct from both the level's
-        // own complete-location id (BaseId + entry.Order) and any item id.
+        // MUST be kept in sync by hand with apworld/superhot/Locations.py's SECRET_LOCATION_OFFSET.
         public const long SecretLocationIdOffset = 20000;
 
-        // MUST be kept in sync by hand with apworld/superhot/Items.py's
-        // WHITE_SPACE_ITEM_NAME/WHITE_SPACE_ITEM_ID_OFFSET -- the pool's one filler item
-        // (real, explicit user request: don't reuse "Level Access: X" as filler, since a
-        // player receiving several would read them as real unlocks). Not a level, so it
-        // has no LevelEntry of its own -- see ItemManager.ApplyItem for how this id is
-        // recognized and handled as a deliberate no-op instead of an "unknown item".
+        // MUST be kept in sync by hand with apworld/superhot/Items.py's WHITE_SPACE_ITEM_ID_OFFSET.
+        // The pool's one filler item, not a level, so it has no LevelEntry -- see
+        // ItemManager.ApplyItem for how this id is handled as a deliberate no-op.
         public const long WhiteSpaceItemId = BaseId + ItemIdOffset + 100;
 
         public static List<LevelEntry> Levels { get; private set; } = new();
         public static Dictionary<long, LevelEntry> LocationIdToLevel { get; private set; } = new();
         public static Dictionary<long, LevelEntry> ItemIdToLevel { get; private set; } = new();
 
-        // Reverse lookup for a level's *secret* location id (BaseId + SecretLocationIdOffset
-        // + entry.Order), distinct from LocationIdToLevel above which only covers the main
-        // completion location range. Added for the Notifications feature's history resync
-        // (Core/LocationManager.cs's OnConnected) -- given a raw checked location id from
-        // Session.Locations.AllLocationsChecked, this is what tells "the main completion
-        // check for level X" apart from "the secret check for level X" so the right log
-        // text ("Sent X" vs "Sent X Secret") can be rebuilt.
+        // Reverse lookup for a level's *secret* location id, distinct from LocationIdToLevel's
+        // main completion range. Lets LocationManager.OnConnected tell "main check for level X"
+        // apart from "secret check for level X" when rebuilding history from a raw location id.
         public static Dictionary<long, LevelEntry> SecretLocationIdToLevel { get; private set; } = new();
 
-        // Kept for logging/reference only -- do NOT use this for gating decisions, see
-        // LevelEntry.LevelId's comment above for why (duplicate scene names make this
-        // dictionary lossy, last-one-wins). Real gating uses LevelIdToLevel instead.
-        public static Dictionary<string, LevelEntry> SceneNameToLevel { get; private set; } = new();
-
-        // The real join key. Keyed by the real game's LevelInfo.ID (== LevelEntry.LevelId
-        // == Order - 1), which is unique per level instance even when SceneName repeats.
+        // The real join key. Keyed by the real game's LevelInfo.ID (LevelEntry.LevelId), which
+        // is unique per level instance even when SceneName repeats.
         public static Dictionary<int, LevelEntry> LevelIdToLevel { get; private set; } = new();
 
         public static void Load(MelonLogger.Instance log)
@@ -129,11 +90,6 @@ namespace SuperhotArchipelago.Core
                     SecretLocationIdToLevel[secretLocationId] = entry;
                 }
 
-                // NOTE: because of the duplicate scene names flagged in levels.json's
-                // _caveats (e.g. "TheyAreYourTools_C_2" appearing at orders 13/16/19),
-                // this dictionary can only hold one LevelEntry per scene name -- last one
-                // wins. Reference/logging only -- see LevelIdToLevel for the real join key.
-                SceneNameToLevel[entry.SceneName] = entry;
                 LevelIdToLevel[entry.LevelId] = entry;
             }
 
@@ -141,19 +97,10 @@ namespace SuperhotArchipelago.Core
         }
 
         /// <summary>
-        /// This mod's own short display name for an item id, if it's one we recognize
-        /// (a level access item, or the White Space filler) -- null otherwise. Real,
-        /// explicit user request: notification text (Core/LocationManager.cs's "Sent"
-        /// side) was running long enough to get truncated/cut off mid-word on the AP
-        /// LOG screen -- the AP-side item name for a level access item includes a
-        /// "Level Access: " prefix (apworld/superhot/Items.py) that's redundant once
-        /// it's already shown as a "Sent"/"Received" line, so this trades that prefix
-        /// for this mod's own already-short LevelEntry.DisplayName ("29 - Train"
-        /// instead of "Level Access: 29 - Train") -- same "prefer our own catalog name
-        /// over AP's own dynamically-fetched one" preference already used everywhere
-        /// else in this codebase (e.g. Core/ItemManager.cs's ApplyItem). Callers should
-        /// fall back to the AP-provided name (e.g. ScoutedItemInfo.ItemDisplayName) when
-        /// this returns null -- covers Victory or any item outside our own catalog.
+        /// This mod's own short display name for an item id, if recognized (a level access
+        /// item or the White Space filler) -- null otherwise. Drops AP's "Level Access: "
+        /// prefix to avoid truncation in notification text; callers should fall back to the
+        /// AP-provided name when this returns null.
         /// </summary>
         public static string? TryGetShortItemDisplayName(long itemId)
         {

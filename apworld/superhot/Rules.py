@@ -1,41 +1,11 @@
-"""Access rules for the SUPERHOT Archipelago world.
-
-v0 logic: level N's completion location requires having received the "Level Access" item
-for level N (and, transitively, for every level before it, since the in-game hub only lets
-you launch levels in order). We only need to state the direct requirement per location --
-Archipelago's fill algorithm doesn't require earlier levels to also be listed as long as
-every level's access item is itself only reachable in order, which in a fully linear game
-with a single access item per level is automatically true (there's no other way to reach
-level N's location than being able to play up through level N).
-
-Level 1 is the one exception: it's reachable from the start of the game, has no access
-item (see Items.py), and so gets no rule here -- it's always in logic.
-
-Secret locations (see Locations.py) use the exact same rule as their level's own
-completion location -- in vanilla, a secret console is something you find *during* a
-normal playthrough of the level, not something that requires having already finished it,
-so gating on "can play this level" rather than "has completed this level" matches how the
-game actually works. Level 1's secret (it has one -- see data/levels.json) follows the
-same no-rule exception as level 1's own location, for the same reason.
-
-The final level (LEVELS[-1], "34 - Free") has no completion location of its own anymore
-(see Locations.py's module docstring) -- only the Victory event location gates on its
-access item, so the main loop below skips it entirely rather than trying to fetch a
-location that no longer exists. It also has no secret (see data/levels.json), so there's
-nothing else to skip it for.
-
-Options.py's levels_required_for_free ("N of the other 31 levels must be actually
-completed before 34 - Free can be entered") deliberately has no access rule here.
-Reaching every other level's own location never depends on Free in any way, so the
-generator can't create a deadlock by not knowing about it -- it's purely a real-time gate
-the mod itself enforces during play, not something Archipelago's own reachability logic
-needs to reason about. See mod/SuperhotArchipelago/Core/LevelAccessGuard.cs.
-
-Real, explicit user request: Options.py's ExcludeSlowLevels toggle removes a level's
-location(s) from this player's world entirely (see Regions.py) -- is_excluded() below
-skips those the same way the loop already skips level 1, since there's no location left to
-set a rule on at all (multiworld.get_location() would raise for one that was never
-created).
+"""Access rules for the SUPERHOT Archipelago world: level N's completion (and secret)
+location requires having received its own "Level Access" item; level 1 has no item and no
+rule. The final level has no completion location of its own (only the Victory event
+location gates on its access item) so the main loop skips it. levels_required_for_free is
+deliberately not an access rule -- it's a real-time gate the mod enforces during play (see
+LevelAccessGuard.cs), not something the generator's reachability logic needs to know
+about. Excluded levels (ExcludeSlowLevels) are skipped the same way level 1 is, since they
+have no location to set a rule on.
 """
 from __future__ import annotations
 

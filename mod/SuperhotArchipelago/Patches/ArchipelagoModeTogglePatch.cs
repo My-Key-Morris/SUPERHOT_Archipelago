@@ -3,61 +3,28 @@ using SuperhotArchipelago.Core;
 namespace SuperhotArchipelago.Patches
 {
     /// <summary>
-    /// Real, explicit user request: a way to switch between playing through Archipelago
-    /// and playing SUPERHOT normally without uninstalling/reinstalling the mod. Answered
-    /// as a dedicated hub button (as opposed to folding it into the existing ARCHIPELAGO
-    /// connect screen, Core/ArchipelagoConnectApp.cs) -- a single click flips the state
-    /// directly, no screen to open first.
-    ///
-    /// Structurally this is Patches/ConnectionButtonPatch.cs's twin: same "keep a live
-    /// button reference and re-derive its label every frame" pattern for the same reason (a
-    /// direct MelonPreferences.cfg edit to Config.Enabled while running is a supported
-    /// parallel path, same as Server/Slot/Password already are -- see Mod.cs). Kept as a
-    /// separate file rather than folded into ConnectionButtonPatch.cs because it's a
-    /// conceptually distinct feature (a mode switch with mod-wide effects, not a connection-
-    /// status display) -- consistent with this project's existing habit of one file per
-    /// distinct concern (see LevelGatePatch.cs/ViaAppGatePatch.cs/DirectLevelSkipPatch.cs/
-    /// TitleCardGatePatch.cs, all separate files gating different launch paths through the
-    /// same shared check).
-    ///
-    /// The click handler itself does nothing but call Mod.SetEnabled(!Config.Enabled.Value)
-    /// -- see that method and Core/LevelAccessGuard.cs's IsEnabled check (and every other
-    /// patch that reads it) for what turning this off actually does mod-wide.
-    ///
-    /// Known limitation, accepted rather than engineered around: native
-    /// piOsMenu.ShouldBeShown()/LockUnfinishedLevels() (see Patches/MenuVisibilityPatch.cs/
-    /// HubUnlockPatch.cs) only re-run when a view is freshly built -- confirmed by
-    /// ConnectionButtonPatch.cs's own Round 17 fix, which hit the exact same staleness for
-    /// its ONLINE/OFFLINE label before per-frame refresh fixed just the label. Toggling AP
-    /// mode won't retroactively re-scramble/re-color level buttons inside an already-open
-    /// "LEVELS" view until the player backs out and re-enters it (which reruns the lock
-    /// pass). Real level-launch gating itself (LevelAccessGuard.ShouldBlock) is unaffected
-    /// by this -- it's checked live at launch time, never baked into a view -- so nothing
-    /// actually un-vanilla is ever launchable in the gap; only some cosmetics can lag by one
-    /// visit. Not worth forcing a view rebuild for pre-emptively; revisit if a real playtest
-    /// finds this confusing in practice.
-    ///
-    /// Round 27 follow-up, real explicit user request ("put all of the archipelago
-    /// selections that are in the hub into a folder"): this class no longer hooks
-    /// piOsMenu.CreateViewFromNode directly or adds itself to the hub's root view --
-    /// Patches/ArchipelagoFolderButtonPatch.cs now owns the one root-view hook, and calls
-    /// AddTo() below to place this button inside its own "ARCHIPELAGO" subfolder view
-    /// instead. Label/behavior otherwise unchanged.
+    /// Adds an "AP MODE" hub button to toggle Archipelago mode on/off without
+    /// uninstalling the mod (Mod.SetEnabled). Mirrors ConnectionButtonPatch.cs's
+    /// live-label-refresh pattern. Note: toggling doesn't retroactively re-scramble
+    /// buttons in an already-open "LEVELS" view (it re-syncs on next visit) -- actual
+    /// launch gating is unaffected since that's checked live, not baked into the view.
     /// </summary>
     public static class ArchipelagoModeTogglePatch
     {
         private const string ButtonLabel = "AP MODE";
 
-        // Not cleared on view teardown -- see ConnectionButtonPatch.cs's class doc for why
-        // that's unnecessary (SHGUIview.Kill() just marks a plain C# object graph as fading
-        // out, confirmed via decompile, not something that can throw on further access).
+        // Not cleared on view teardown -- SHGUIview.Kill() just fades a plain C# object,
+        // it can't throw on further access.
         internal static SHGUIcommanderbutton? Button { get; private set; }
 
+        // Skips the rebuild below when enabled-state hasn't actually changed since
+        // RefreshLabel runs every frame. Reset to null on a new button so its first
+        // refresh always applies.
+        private static bool? _lastEnabled;
+
         /// <summary>
-        /// Builds this button and adds it to whatever view the caller passes in --
-        /// Patches/ArchipelagoFolderButtonPatch.cs's own "ARCHIPELAGO" subfolder view, not
-        /// the hub's root anymore. See class doc for why this changed from a direct
-        /// CreateViewFromNode Postfix.
+        /// Builds this button into the given view (the "ARCHIPELAGO" subfolder built by
+        /// ArchipelagoFolderButtonPatch.cs), not the hub root.
         /// </summary>
         internal static void AddTo(SHGUIcommanderview view)
         {
@@ -72,13 +39,13 @@ namespace SuperhotArchipelago.Patches
             view.AddButtonView(button);
 
             Button = button;
+            _lastEnabled = null;
             RefreshLabel();
         }
 
         /// <summary>
-        /// Recomputes and applies the button's ON/OFF status text from live config state.
-        /// Called once right after creation above, and every frame from Mod.OnUpdate() --
-        /// see class doc for why a one-time compute at creation isn't enough on its own.
+        /// Recomputes and applies the button's ON/OFF text from live config state. Called
+        /// once at creation and every frame from Mod.OnUpdate() to stay in sync.
         /// </summary>
         internal static void RefreshLabel()
         {
@@ -87,6 +54,13 @@ namespace SuperhotArchipelago.Patches
                 return;
             }
 
+            bool enabled = Config.Enabled.Value;
+            if (enabled == _lastEnabled)
+            {
+                return;
+            }
+
+            _lastEnabled = enabled;
             Button.ButtonText = BuildLabel();
             Button.RefreshText();
         }

@@ -3,12 +3,8 @@ using System.Collections.Generic;
 namespace SuperhotArchipelago.Core
 {
     /// <summary>
-    /// One colored run of text within a single notification log line. Real, explicit
-    /// user request: "See if we can color check received similar to text client" --
-    /// a plain flat string per line (the original design) can't represent that, since
-    /// a single line needs its item name, player name, and connective words each in
-    /// their own color. See Core/NotificationColors.cs for the actual palette and why
-    /// it's limited to what SUPERHOT's native renderer supports.
+    /// One colored run of text within a single notification log line, since a line needs its item
+    /// name, player name, and connective words each in their own color. See NotificationColors.cs.
     /// </summary>
     public readonly struct LogSegment
     {
@@ -23,138 +19,60 @@ namespace SuperhotArchipelago.Core
     }
 
     /// <summary>
-    /// Real, explicit user request: "a popup while the user is playing to show recent
-    /// checks pertaining to them. I also [want] a log section in the hub to see older
-    /// notifications" -- scoped to items received and the player's own checks sent (not
-    /// other players' checks, which SUPERHOT has no in-fiction way to attribute to a
-    /// location the player would recognize). This class is the single shared sink both
-    /// halves of that request go through: Core/ItemManager.cs and Core/LocationManager.cs
-    /// call Add() when something notification-worthy happens, Core/ArchipelagoLogApp.cs's
-    /// screen reads Entries to render the hub log.
-    ///
-    /// Popup delivery reuses TextManager.AddUptitleToQueue(LocalizableText) -- the same
-    /// native queued top-of-screen text mechanism this mod already uses for LOCKED block
-    /// messages (see e.g. Core/LevelAccessGuard.cs's callers), rather than building a
-    /// second, separate popup system.
-    ///
-    /// Real, explicit user request: the log should reflect this slot's full history on
-    /// the Archipelago server, not just whatever happened to occur during the current
-    /// process/connection -- toggling AP MODE off and back on (or restarting the game)
-    /// should never look like it erased anything, only refreshed once reconnected. The
-    /// log itself is still a plain in-memory list, not persisted to disk -- but
-    /// ArchipelagoConnection.Connect() calls Clear() below right before every successful
-    /// connect (including a reconnect), and LocationManager.cs/ItemManager.cs each
-    /// rebuild their half from the server's own authoritative state on every
-    /// Connected event (Session.Locations.AllLocationsChecked and the replayed
-    /// ItemReceived history respectively) -- so the log always ends up back at the same
-    /// complete, correct picture a moment after connecting, not a partial one.
+    /// Shared sink for the notification popup/log feature: ItemManager.cs and LocationManager.cs call
+    /// Add() when something notification-worthy happens (items received and the player's own checks
+    /// sent, not other players' checks); ArchipelagoLogApp.cs renders Entries as the hub log. The list
+    /// is in-memory only, but Connect() clears it and both managers rebuild it from server state on
+    /// every connect, so it always reflects this slot's full history rather than just this session's.
     /// </summary>
     public static class NotificationLog
     {
-        // Generous defensive cap, not a real, expected limit -- a maximally-played run
-        // has at most 58 item-received entries and 58 check-sent entries (see
-        // LevelCatalog), so this is never expected to actually trigger.
+        // Defensive cap only -- a maximally-played run has at most ~116 entries, so this shouldn't trigger.
         private const int MaxEntries = 200;
 
-        // Real, explicit user request: "See if we can color check received similar to
-        // text client" -- each entry is now an array of colored segments rather than a
-        // plain string, so ArchipelagoLogApp.cs can render "Sent Level Access: X to Y"
-        // with the item and player names in their own colors instead of one flat line.
-        // See LogSegment's own doc above.
+        // Each entry is an array of colored segments (see LogSegment) rather than a plain string, so
+        // ArchipelagoLogApp.cs can render item/player names in their own colors.
         private static readonly List<LogSegment[]> _entries = new();
 
-        // Real bug found by live testing: the log was showing every "Received" entry
-        // from a reconnect's history resync as one solid block, followed much later by
-        // every "Sent" entry as a second solid block -- instead of the two naturally
-        // interleaved, matching how the player actually experienced them (check a
-        // location, get its item, check the next one...). Root cause: ItemManager.cs's
-        // resync (Session.Items.AllItemsReceived) is a synchronous, in-memory snapshot
-        // that finishes within the same frame, while LocationManager.cs's resync
-        // (Session.Locations.ScoutLocationsAsync) is a real network round-trip that
-        // only finishes several frames later -- so one manager's whole batch always
-        // lands in the log well before the other's, no matter how the underlying
-        // events were actually ordered in-game. Each entry now carries an explicit
-        // orderKey (see Add() below) -- both managers use Archipelago's own location
-        // id for historical/catch-up entries (ItemManager via ItemInfo.LocationId, the
-        // location that granted the item; LocationManager via the location id it
-        // scouted), which is the same numbering scheme for both, so a location's
-        // "Sent" and "Received" entries now sort next to each other regardless of
-        // which async batch actually appends first. Live (non-catch-up) entries keep
-        // using long.MaxValue -- always sorts after every historical entry, and among
-        // themselves in true real-time call order, exactly like before this fix.
+        // ItemManager's resync is synchronous while LocationManager's is an async network round-trip, so
+        // without an explicit sort key, historical "Sent"/"Received" entries land in two separate blocks
+        // instead of interleaved by location. Each entry carries an orderKey (a shared Archipelago
+        // location id for historical entries, long.MaxValue for live ones) so they sort correctly.
         private static readonly List<long> _entryOrderKeys = new();
 
-        // Real bug reports from live testing: a popup queued at the exact moment a
-        // secret console's "content app" overlay opens never became visible at all,
-        // and one queued right at level completion was visible only very briefly.
-        // Root cause for both, confirmed via decompile: TextManager's native
-        // uptitleSHGUIQueue gives every entry a flat ~1 real-time second
-        // (Update()'s uptitleSHGUITimer, reset to 1f each time an item is popped)
-        // before moving on, with no guarantee of an undisturbed turn -- a secret's
-        // content app freezes gameplay via TimeControl.forcedTimeScale = 0f
-        // (TerminalActivator.OnActivate) for as long as the player leaves it open,
-        // during which our message's single second can tick away unseen; a level
-        // completion's scene transition to the hub is similarly disruptive. Popups
-        // are queued here instead of calling TextManager.AddUptitleToQueue directly,
-        // and only actually dispatched by FlushPendingPopups() (called every frame
-        // from Mod.OnUpdate()) once TimeControl.forcedTimeScale is back to its
-        // normal not-frozen state -- the same real-time signal
-        // TerminalActivator.Update() itself uses to notice its own content app has
-        // closed.
+        // TextManager's native uptitle queue gives each entry only ~1 real-time second, which can tick by
+        // unseen during a secret's content-app freeze or a level-completion scene transition. Popups are
+        // queued here instead and only dispatched by FlushPendingPopups() once forcedTimeScale is unfrozen.
         private static readonly List<string> _pendingPopups = new();
 
-        // Each dispatched popup is queued this many times in a row in the native
-        // queue, since a single entry's ~1-second display (see above) isn't a
-        // configurable value without patching TextManager's own timer field --
-        // repeating the same text is a low-risk way to get a longer, more readable
-        // display out of the existing public API instead.
+        // Repeats each popup this many times since the ~1-second display isn't otherwise configurable
+        // without patching TextManager's timer field.
         private const int PopupRepeatCount = 3;
 
-        // Real, explicit user report: a burst of many real checks/receives in quick
-        // succession (e.g. speed-running several already-unlocked levels back to
-        // back) queued so many popups -- each repeated PopupRepeatCount times, at
-        // ~1 real second per native queue slot -- that later ones were still working
-        // through the backlog well after the actions that triggered them, looking
-        // like they'd gotten mismatched with whatever the player was doing by then.
-        // Capping how many distinct pending popups are kept means live popups can
-        // never fall meaningfully behind real time -- a dropped one is still fully
-        // preserved in the log (Add() records logText unconditionally, this only
-        // ever trims _pendingPopups), so nothing is actually lost, just not popped
-        // up individually during a big burst.
+        // Caps pending popups so a burst of checks/receives can't queue so many that later popups fall
+        // far behind real time -- a dropped popup is still preserved in the log, just not shown.
         private const int MaxPendingPopups = 4;
 
         /// <summary>Full log entries, oldest first -- what Core/ArchipelagoLogApp.cs renders.</summary>
         public static IReadOnlyList<LogSegment[]> Entries => _entries;
 
         /// <summary>
-        /// Records one log line, and -- if popupText is non-null -- also queues it as an
-        /// in-game popup. Callers pass null for popupText for anything that shouldn't
-        /// interrupt play (history being replayed/resynced on connect; see
-        /// ItemManager.cs/LocationManager.cs), and real display text otherwise. popupText
-        /// itself stays a plain string -- TextManager's native uptitle queue is a single
-        /// flat string with no per-substring color support (see LogSegment's own doc),
-        /// so only the log screen ever gets the colored version.
-        ///
-        /// Defaults orderKey to long.MaxValue -- plain chronological append, correct for
-        /// any genuinely live event, which is every caller except the two historical
-        /// resync loops (see the 3-arg overload below and _entryOrderKeys' own comment).
+        /// Records one log line, and queues it as a popup if popupText is non-null (null for
+        /// history/resync entries that shouldn't interrupt play). Defaults orderKey to long.MaxValue --
+        /// correct for any live event; see the 3-arg overload for historical entries.
         /// </summary>
         public static void Add(LogSegment[] segments, string? popupText) => Add(segments, popupText, long.MaxValue);
 
         /// <summary>
-        /// Convenience overload for callers with nothing worth coloring (error/fallback
-        /// messages) -- wraps the whole line as one default-colored segment rather than
-        /// making every call site build a one-element array by hand.
+        /// Convenience overload for uncolored lines (error/fallback messages) -- wraps the text as one
+        /// default-colored segment.
         /// </summary>
         public static void Add(string plainText, string? popupText) =>
             Add(new[] { new LogSegment(plainText, NotificationColors.Default) }, popupText, long.MaxValue);
 
         /// <summary>
-        /// Same as Add(LogSegment[], string?) above, but inserts the entry in ascending
-        /// orderKey position among other entries rather than always appending -- see
-        /// _entryOrderKeys' own comment for why this exists. Historical/catch-up callers
-        /// pass a real Archipelago location id here; everything else should keep using
-        /// the 2-arg overload (which passes long.MaxValue, i.e. "always append last").
+        /// Same as the 2-arg Add(), but inserts at ascending orderKey position instead of always
+        /// appending (see _entryOrderKeys). Historical/catch-up callers pass a real location id here.
         /// </summary>
         public static void Add(LogSegment[] segments, string? popupText, long orderKey)
         {
@@ -182,10 +100,8 @@ namespace SuperhotArchipelago.Core
         }
 
         /// <summary>
-        /// Dispatches any popups queued by Add() above to the native uptitle system,
-        /// but only once it's safe to -- see _pendingPopups' own comment for the full
-        /// reasoning. Called every frame from Mod.OnUpdate(); cheap no-op on every
-        /// frame with nothing pending.
+        /// Dispatches popups queued by Add() to the native uptitle system once it's safe to (see
+        /// _pendingPopups). Called every frame from Mod.OnUpdate(); a no-op when nothing is pending.
         /// </summary>
         public static void FlushPendingPopups()
         {
@@ -205,11 +121,8 @@ namespace SuperhotArchipelago.Core
         }
 
         /// <summary>
-        /// Called by ArchipelagoConnection.Connect() right before every successful
-        /// connect (including a reconnect). The log is about to be fully rebuilt from
-        /// the server's own authoritative history (see class doc) -- clearing first
-        /// means a reconnect can never leave stale or duplicated lines behind, only a
-        /// clean, correct picture a moment later.
+        /// Called by ArchipelagoConnection.Connect() right before every connect, so a reconnect never
+        /// leaves stale or duplicated lines behind once the log is rebuilt.
         /// </summary>
         public static void Clear()
         {
