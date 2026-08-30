@@ -175,6 +175,19 @@ namespace SuperhotArchipelago.Core
             // correct picture rather than a stale or duplicated one.
             NotificationLog.Clear();
 
+            // Real bug found by live testing, reported verbatim: "now every level is
+            // unlocked from the beginning... might be because i opened in already
+            // finished ap then opened this new one." Confirmed exactly right --
+            // UnlockState is a static set that used to never get cleared anywhere, so
+            // a previous room's unlocks (all 31 of them, for a finished room) stayed
+            // live for the rest of this game session and bled straight into whatever
+            // room got connected to next. Cleared here for the same reason and at the
+            // same point as NotificationLog.Clear() above -- ItemManager.OnConnected()
+            // (which runs from the Connected event fired right below) fully
+            // repopulates it from the new room's own item history a moment later, so
+            // this can never leave a genuinely-connected room looking under-unlocked.
+            UnlockState.Clear();
+
             _log.Msg($"Connected to Archipelago as '{slotName}'.");
 
             // Real bug found by live testing: `Connected?.Invoke()` used to be a plain

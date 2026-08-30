@@ -38,5 +38,27 @@ namespace SuperhotArchipelago.Core
         {
             return _unlockedLevelIds.Contains(levelId);
         }
+
+        /// <summary>
+        /// Real bug reported directly by the user, and reproduced exactly as described:
+        /// "opened in an already-finished AP [room], then opened this new one" and every
+        /// level showed unlocked from the start. Root cause: this set is `static` and was
+        /// never cleared anywhere -- it lives for as long as the mod is loaded (i.e. the
+        /// whole game session), not per-connection. `ItemManager.OnConnected()` drains
+        /// the new room's item history into this set on every connect, but only ever
+        /// *adds* to it; a previous room that had every level's access item already
+        /// granted (a finished room, or just one played further) left every one of those
+        /// level ids sitting in here permanently, bleeding straight into whatever room is
+        /// opened next in the same game session. Fixed by calling this from
+        /// ArchipelagoConnection.Connect() right alongside NotificationLog.Clear() --
+        /// same reasoning, same call site: every connect (including a reconnect, and
+        /// especially including connecting to a *different* room) should start from a
+        /// clean slate that only ItemManager.OnConnected()'s own replay of the room
+        /// actually being connected to can repopulate.
+        /// </summary>
+        public static void Clear()
+        {
+            _unlockedLevelIds.Clear();
+        }
     }
 }
