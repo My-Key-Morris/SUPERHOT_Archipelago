@@ -179,7 +179,11 @@ namespace SuperhotArchipelago.Core
                 new LogSegment(" from ", NotificationColors.Default),
                 new LogSegment(senderDisplayName, NotificationColors.Player),
             };
-            string text = $"Received {itemDisplayName} from {senderDisplayName}";
+            // Log entry is unconditional; only the live popup respects the ARCHIPELAGO >
+            // SETTINGS filter toggles (Config.ShouldNotify), so AP LOG stays a complete record.
+            string? text = Config.ShouldNotify(NotificationColors.Classify(flags))
+                ? $"Received {itemDisplayName} from {senderDisplayName}"
+                : null;
 
             if (isCatchUp)
             {

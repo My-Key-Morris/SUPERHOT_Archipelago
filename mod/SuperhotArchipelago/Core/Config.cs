@@ -23,6 +23,14 @@ namespace SuperhotArchipelago.Core
         // is seen). See Mod.cs's IsEnabled/SetEnabled and the hub's AP MODE toggle button.
         public static MelonPreferences_Entry<bool> Enabled { get; private set; } = null!;
 
+        // Per-item-classification popup toggles, all default true -- see the ARCHIPELAGO >
+        // SETTINGS folder (NotificationSettingsButtonPatch.cs) and Config.ShouldNotify below.
+        // These only suppress the live popup; NotificationLog's AP LOG history is unaffected.
+        public static MelonPreferences_Entry<bool> NotifyProgression { get; private set; } = null!;
+        public static MelonPreferences_Entry<bool> NotifyUseful { get; private set; } = null!;
+        public static MelonPreferences_Entry<bool> NotifyFiller { get; private set; } = null!;
+        public static MelonPreferences_Entry<bool> NotifyTrap { get; private set; } = null!;
+
         public static void Load()
         {
             _category = MelonPreferences.CreateCategory(
@@ -41,11 +49,36 @@ namespace SuperhotArchipelago.Core
                 "Enabled", true, "Enabled",
                 "Whether Archipelago mode is on. Turn off to play vanilla SUPERHOT (no " +
                 "level gating, no hub overlay) without uninstalling the mod.");
+            NotifyProgression = _category.CreateEntry(
+                "NotifyProgression", true, "NotifyProgression",
+                "Popup for progression items.");
+            NotifyUseful = _category.CreateEntry(
+                "NotifyUseful", true, "NotifyUseful",
+                "Popup for useful items.");
+            NotifyFiller = _category.CreateEntry(
+                "NotifyFiller", true, "NotifyFiller",
+                "Popup for normal (filler) items -- most checks.");
+            NotifyTrap = _category.CreateEntry(
+                "NotifyTrap", true, "NotifyTrap",
+                "Popup for trap items.");
 
             _category.SaveToFile(printmsg: false);
         }
 
         public static bool IsConfigured => Server.Value != "" && Slot.Value != "";
+
+        /// <summary>Whether a live popup should show for an item of this classification -- the AP LOG
+        /// history is unaffected either way. See the ARCHIPELAGO > SETTINGS hub folder.</summary>
+        public static bool ShouldNotify(NotificationColors.ItemClass itemClass)
+        {
+            return itemClass switch
+            {
+                NotificationColors.ItemClass.Progression => NotifyProgression.Value,
+                NotificationColors.ItemClass.Useful => NotifyUseful.Value,
+                NotificationColors.ItemClass.Trap => NotifyTrap.Value,
+                _ => NotifyFiller.Value,
+            };
+        }
 
         // Category kept around (rather than a local in Load()) so ArchipelagoConnectApp.cs can
         // persist in-game connect-screen changes the same way, since CreateEntry alone never

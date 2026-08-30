@@ -22,28 +22,49 @@ namespace SuperhotArchipelago.Core
         public const char FillerItem = 'z';
         public const char Default = 'w';
 
+        /// <summary>Same four buckets as ForItemFlags, but as an enum -- shared with Config.ShouldNotify
+        /// so the notification-filter toggles use the exact same classification as the popup color.</summary>
+        public enum ItemClass
+        {
+            Progression,
+            Useful,
+            Trap,
+            Filler,
+        }
+
         /// <summary>
         /// Trap is checked first since ItemFlags is a bitmask and a trap could also carry
         /// other flags, but trap is the property a player most needs a heads-up about.
         /// </summary>
-        public static char ForItemFlags(ItemFlags flags)
+        public static ItemClass Classify(ItemFlags flags)
         {
             if (flags.HasFlag(ItemFlags.Trap))
             {
-                return TrapItem;
+                return ItemClass.Trap;
             }
 
             if (flags.HasFlag(ItemFlags.Advancement))
             {
-                return ProgressionItem;
+                return ItemClass.Progression;
             }
 
             if (flags.HasFlag(ItemFlags.NeverExclude))
             {
-                return UsefulItem;
+                return ItemClass.Useful;
             }
 
-            return FillerItem;
+            return ItemClass.Filler;
+        }
+
+        public static char ForItemFlags(ItemFlags flags)
+        {
+            return Classify(flags) switch
+            {
+                ItemClass.Trap => TrapItem,
+                ItemClass.Progression => ProgressionItem,
+                ItemClass.Useful => UsefulItem,
+                _ => FillerItem,
+            };
         }
     }
 }

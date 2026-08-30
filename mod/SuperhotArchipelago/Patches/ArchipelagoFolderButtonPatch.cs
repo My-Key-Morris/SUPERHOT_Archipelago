@@ -7,11 +7,12 @@ namespace SuperhotArchipelago.Patches
 {
     /// <summary>
     /// Adds a single "ARCHIPELAGO" folder button to the hub root (the only class still
-    /// hooking piOsMenu.CreateViewFromNode's root Postfix); CONNECT/AP MODE/AP LOG build
-    /// themselves into the subfolder opened from here instead of the root. The subfolder
-    /// is a hand-built SHGUIcommanderview (same approach native folders like "LEVELS" use)
-    /// so it needs no XML/reflection hookup. Inserted just above SETTINGS, with button
-    /// rows recomputed afterward since AddButtonView only appends to the end of the list.
+    /// hooking piOsMenu.CreateViewFromNode's root Postfix); CONNECT/AP MODE/AP LOG/SETTINGS
+    /// build themselves into the subfolder opened from here instead of the root. The
+    /// subfolder is a hand-built SHGUIcommanderview (same approach native folders like
+    /// "LEVELS" use) so it needs no XML/reflection hookup. Inserted just above the hub's own
+    /// native SETTINGS button, with rows recomputed afterward since AddButtonView only
+    /// appends to the end of the list.
     /// </summary>
     [HarmonyPatch(typeof(piOsMenu), "CreateViewFromNode",
         new[] { typeof(XElement), typeof(List<int>), typeof(List<int>), typeof(float), typeof(bool) })]
@@ -34,7 +35,8 @@ namespace SuperhotArchipelago.Patches
             {
                 OpenFolder();
             }).SetListLink(___createdView).SetData(
-                "Connect to a server, toggle Archipelago mode, or view your check/item history.");
+                "Connect to a server, toggle Archipelago mode, view your check/item history, " +
+                "or configure notification settings.");
 
             ___createdView.AddButtonView(button);
             InsertAboveSettings(___createdView);
@@ -87,6 +89,7 @@ namespace SuperhotArchipelago.Patches
             ConnectionButtonPatch.AddTo(folderView);
             ArchipelagoModeTogglePatch.AddTo(folderView);
             ArchipelagoLogButtonPatch.AddTo(folderView);
+            NotificationSettingsButtonPatch.AddTo(folderView);
 
             SHGUI.current.AddViewOnTop(folderView);
         }

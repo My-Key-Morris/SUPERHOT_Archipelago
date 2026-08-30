@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using Archipelago.MultiClient.Net.Enums;
 using Archipelago.MultiClient.Net.Models;
 using MelonLoader;
 
@@ -262,9 +263,11 @@ namespace SuperhotArchipelago.Core
                 {
                     string popupText;
                     LogSegment[] segments;
+                    ItemFlags? scoutedFlags = null;
                     if (!task.IsFaulted && !task.IsCanceled && task.Result != null &&
                         task.Result.TryGetValue(locationId, out ScoutedItemInfo scouted))
                     {
+                        scoutedFlags = scouted.Flags;
                         // Uses the mod's shorter catalog item name where recognized, since AP's own name was
                         // getting truncated on the AP LOG screen.
                         string itemName = LevelCatalog.TryGetShortItemDisplayName(scouted.ItemId) ?? scouted.ItemDisplayName;
@@ -311,8 +314,11 @@ namespace SuperhotArchipelago.Core
                     }
 
                     // Always live here, so long.MaxValue keeps this a plain chronological append; only the
-                    // history-resync path needs a real location-id order key.
-                    _pendingNotifications.Enqueue((segments, isLive ? popupText : null, long.MaxValue));
+                    // history-resync path needs a real location-id order key. The log entry (segments) is
+                    // always queued; only the popup itself respects the ARCHIPELAGO > SETTINGS filter
+                    // toggles below, and only when a real classification was scouted (scoutedFlags).
+                    bool showPopup = isLive && (scoutedFlags == null || Config.ShouldNotify(NotificationColors.Classify(scoutedFlags.Value)));
+                    _pendingNotifications.Enqueue((segments, showPopup ? popupText : null, long.MaxValue));
                 }
                 catch (System.Exception ex)
                 {
