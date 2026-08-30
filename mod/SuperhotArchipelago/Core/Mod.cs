@@ -256,39 +256,39 @@ namespace SuperhotArchipelago.Core
             // "TheyAreYourTools_C_2" etc. really do recur, and in what order.
             LoggerInstance.Msg($"Scene loaded: {sceneName} (buildIndex {buildIndex})");
 
-            // Real bug found by a live playtest of the AP mode toggle: Patches/HubUnlockPatch.cs
-            // (per-level lock/color/badge visuals) was silently never running at all -- not a
-            // regression from the toggle feature itself, but a pre-existing, latent issue this
-            // was the first time anyone actually verified HubUnlockPatch live in a running game
-            // in a while. Root cause, confirmed by reading this exact save file directly:
-            // "storyFinished" was already true on disk, almost certainly written before
-            // Patches/StoryFinishedSuppressPatch.cs ever existed to stop it (that patch only
-            // blocks *new* writes of true -- it does nothing about a value already saved).
-            // Confirmed via decompile (see StoryFinishedSuppressPatch.cs's own docstring):
-            // piOsMenu's "storylevels" case only calls piOsMenu.LockUnfinishedLevels() -- the
-            // method HubUnlockPatch.cs hooks -- when storyFinished is false. With it stuck true,
-            // that method (and therefore HubUnlockPatch's entire Postfix) never gets called at
-            // all, leaving every level exactly as native's own last real pass left it -- which,
-            // combined with this save's "highestfinishedLevel" also already being maxed out from
-            // extensive past testing, meant every level rendered as native "already finished"
-            // (clean text, white) instead of AP's own scrambled/locked look. The actual launch
-            // gate (LevelAccessGuard.ShouldBlock, called independently at click time) was never
-            // affected by any of this -- it doesn't depend on LockUnfinishedLevels() running at
-            // all -- which is exactly why genuinely locked levels still correctly refused to
-            // launch even while looking wrongly unlocked.
+            // Historical note, corrected this round: this method used to also contain a
+            // block that force-reset "storyFinished" back to false whenever Archipelago
+            // mode found it true on disk, to work around piOsMenu's "storylevels" case
+            // only calling LockUnfinishedLevels() (the method HubUnlockPatch.cs hooks)
+            // when storyFinished is false -- otherwise HubUnlockPatch's entire Postfix
+            // silently stopped running, leaving every level looking natively "already
+            // finished" instead of showing AP's own locked/scrambled state.
             //
-            // Fixed by actively resetting the flag (not just suppressing future writes) the
-            // moment it's found true while Archipelago mode is on -- scoped to IsEnabled so
-            // vanilla play (mode off) is never touched: a player genuinely finishing the game
-            // vanilla should still get the real ending behavior. SetValue(false) here passes
-            // straight through StoryFinishedSuppressPatch's own Prefix untouched (it only
-            // intercepts writes of true), so this doesn't fight that patch.
-            if (IsEnabled && IsFullyConnected && SaveManager.Instance != null && SaveManager.Instance.GetValueAs("storyFinished", false))
-            {
-                LoggerInstance.Msg("Found 'storyFinished' already true on disk (likely saved before this " +
-                    "mod suppressed it) -- resetting to false so the hub's per-level lock pass can run again.");
-                SaveManager.Instance.SetValue("storyFinished", false);
-            }
+            // That fix, and the older Patches/StoryFinishedSuppressPatch.cs it worked
+            // alongside (which unconditionally blocked every write of
+            // storyFinished=true), were both removed this round after a real user
+            // report ("I don't have access to a mod you get when you finish the
+            // story"): permanently keeping this flag false also permanently fails the
+            // native MODS folder's own unlock check
+            // (piOsMenu.AppendGameDataListFromNode requires storyFinished=true), so
+            // nobody playing through Archipelago could ever unlock a native gameplay
+            // mod, even after genuinely finishing the real game. Both patches' original
+            // justification also rested on a mistaken belief -- that this flag was
+            // somehow tied to the disruptive "menu scramble/quit-pressure" hub
+            // behavior -- which decompiling further this round showed is actually
+            // caused by an entirely unrelated one-shot scripted event
+            // (YourHeadOk -> APPrestrict -> SHGUI.current.RestrictedAccess), never
+            // derived from or written through storyFinished at all.
+            //
+            // The actual problem this block and StoryFinishedSuppressPatch.cs were
+            // solving for -- HubUnlockPatch going silent once storyFinished is true --
+            // is now fixed properly instead of by keeping the flag perpetually false:
+            // see Patches/StoryLevelsUnlockPatch.cs, which forces
+            // piOsMenu.LockUnfinishedLevels() to keep running for the LEVELS folder
+            // regardless of storyFinished's value. storyFinished itself is now left
+            // alone to behave exactly like vanilla (set true by "22 - Hacker"'s own
+            // ending, or explicitly by Core/LocationManager.cs the moment the real
+            // finale is completed through Archipelago -- see its CheckLocation).
 
             // Real bug report: SUPERHOT's own "all secrets found" Steam achievement
             // (TerminalActivator.CheckAllSecretsAchievement(), confirmed via decompile)

@@ -257,6 +257,30 @@ namespace SuperhotArchipelago.Core
             {
                 _connection.Session.SetGoalAchieved();
                 _log.Msg($"'{level.DisplayName}' was the final level -- reported goal achieved.");
+
+                // Real, explicit user report: "I don't have access to a mod (the ones
+                // inside of SUPERHOT) that I believe you get when you finish the story."
+                // Root cause, confirmed via decompile: the native MODS folder's own
+                // unlock check (piOsMenu.AppendGameDataListFromNode) requires
+                // SaveManager's "storyFinished" flag, which natively is only ever set
+                // true from one place in a normal playthrough -- "22 - Hacker"'s own
+                // narrative fake-ending scene (LevelTest77_HackerRoomFlowControlVariantEnding.cs).
+                // That's a real problem for an AP run specifically: "22 - Hacker" is one
+                // of the levels ExcludeSlowLevels can skip entirely (see
+                // Options.py/levels.json), and even when it isn't excluded, nothing
+                // guarantees the player revisits that exact scripted scene after AP
+                // grants the last access item, the way they would in a native
+                // straight-through playthrough. Setting it explicitly here means
+                // finishing the real game through Archipelago always grants it, exactly
+                // once, regardless of whether Hacker Room's own ending ever played out
+                // this run. See Patches/StoryLevelsUnlockPatch.cs for the other half of
+                // this fix (keeping the hub's own lock-refresh pass alive once this flag
+                // is true) and NOTES.md's Round 38 for the full investigation --
+                // including the mistaken belief, corrected this round, that this flag
+                // was ever the cause of the disruptive "menu scramble" behavior
+                // Patches/StoryFinishedSuppressPatch.cs used to exist to prevent (that's
+                // actually YourHeadOk/APPrestrict/SHGUI.RestrictedAccess, unrelated).
+                SaveManager.Instance.SetValue("storyFinished", true);
             }
         }
 
