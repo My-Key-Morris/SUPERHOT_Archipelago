@@ -5,25 +5,30 @@ namespace SuperhotArchipelago.Patches
     /// <summary>
     /// Our AP notifications (and native LOCKED messages) render through TextManager's shared
     /// uptitle SHGUItext, which is plain white by default -- illegible over the game's many
-    /// stark-white void levels, its single biggest visual motif. Tried a black per-character
-    /// backdrop box first (SHGUItext.SetBackColor) plus padding to enlarge it, but live
-    /// testing (NOTES.md's Rounds 43-45) showed it still read as a weak, insufficient gradient
-    /// over pure white screens no matter how it was tuned, and the padding approach caused a
-    /// serious regression (broke hub button clicks) along the way. Real, explicit user
-    /// decision: simpler and more reliable to just make the text itself black, since white is
-    /// the dominant background color throughout the game -- trades away legibility over the
-    /// minority of dark/black scenes, a tradeoff the user accepted. Postfixes
+    /// stark-white void levels, its single biggest visual motif. Tried black text alone
+    /// (Round 46) on the theory that white backgrounds dominate, but live testing showed a
+    /// scene where the native "ShowUptitle" vignette effect visibly darkened the uptitle's own
+    /// band -- black text over that darkened band was completely invisible, worse than the
+    /// original white-on-white case. Back to white text (SHGUItext's own default, so no
+    /// SetColor call needed) plus a black per-character backdrop (SetBackColor, confirmed via
+    /// decompile of SHGUI.DrawText's SetPixelBack call) -- known imperfect (NOTES.md's Rounds
+    /// 42-45: the backdrop alone still reads as weak on pure white), but strictly better than
+    /// black text vanishing entirely against a darkened background. Postfixes
     /// CreateSHGUITextView (which (re)creates uptitleSHGUI on every scene load, a genuine
-    /// instance method so Harmony's "___uptitleSHGUI" field-injection is valid here) and sets
-    /// its foreground color via SHGUItext's inherited SetColor(char) instead of touching the
-    /// backdrop at all.
+    /// instance method so Harmony's "___uptitleSHGUI" field-injection is valid here).
     /// </summary>
     [HarmonyPatch(typeof(TextManager), nameof(TextManager.CreateSHGUITextView))]
-    public static class UptitleTextColorPatch
+    public static class UptitleBackdropPatch
     {
         public static void Postfix(SHGUItext ___uptitleSHGUI)
         {
-            ___uptitleSHGUI?.SetColor('0');
+            if (___uptitleSHGUI == null)
+            {
+                return;
+            }
+
+            ___uptitleSHGUI.SetColor('w');
+            ___uptitleSHGUI.SetBackColor('0');
         }
     }
 }
