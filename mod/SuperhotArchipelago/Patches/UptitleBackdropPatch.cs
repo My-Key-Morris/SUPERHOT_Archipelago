@@ -71,4 +71,30 @@ namespace SuperhotArchipelago.Patches
             return string.Join("\n", padded.ToArray());
         }
     }
+
+    /// <summary>
+    /// Padding broke native horizontal centering: TextManager's own OnLocalizableTextChanged
+    /// handler centers uptitleSHGUI using the WHOLE string's Length (including every newline
+    /// and every padded row), which only happened to work before because real messages were
+    /// a single line. Once UptitlePaddingPatch adds margin and blank rows, that inflated
+    /// length pushed x far enough left that most of the text (and its backdrop) rendered
+    /// off-screen -- confirmed live: only a sliver of text/backdrop remained visible, cut into
+    /// fragments. Re-centers uptitleSHGUI here using GetLongestLineLength() (a real line width,
+    /// ignoring newlines) instead, right after the native method (and its bad centering) runs.
+    /// </summary>
+    [HarmonyPatch(typeof(TextManager), nameof(TextManager.SetUptitle),
+        new[] { typeof(LocalizableText), typeof(bool), typeof(bool), typeof(bool) })]
+    public static class UptitleCenteringPatch
+    {
+        public static void Postfix(SHGUItext ___uptitleSHGUI)
+        {
+            if (___uptitleSHGUI == null)
+            {
+                return;
+            }
+
+            int longestLine = ___uptitleSHGUI.GetLongestLineLength();
+            ___uptitleSHGUI.x = SHGUI.current.resolutionX / 2 - longestLine / 2 + 1;
+        }
+    }
 }
