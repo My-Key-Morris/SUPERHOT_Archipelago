@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using Archipelago.MultiClient.Net.Enums;
 using MelonLoader;
 
 namespace SuperhotArchipelago.Core
@@ -31,13 +32,35 @@ namespace SuperhotArchipelago.Core
             public readonly long ItemId;
             public readonly long LocationId;
             public readonly string SenderDisplayName;
+
+            // Real, explicit user follow-up request: "merge sends to self into one
+            // line". ItemInfo.Player is "the player of the world the item is located
+            // in" (confirmed via the Archipelago.MultiClient.Net.dll source docs) --
+            // i.e. whoever's location check actually produced this item, not
+            // necessarily who's receiving it. Comparing this slot against our own
+            // (ArchipelagoConnection.Session.ConnectionInfo.Slot, read at Notify()
+            // time rather than cached here since it can't change mid-connection) is
+            // what lets Notify() recognize "the location I just checked happened to
+            // contain my own item" and skip its own line entirely -- see that
+            // method's own comment for why LocationManager.cs's matching check
+            // already produces the one merged line this event needs.
+            public readonly int SenderSlot;
             public readonly bool IsCatchUp;
 
-            public QueuedItem(long itemId, long locationId, string senderDisplayName, bool isCatchUp)
+            // Real, explicit user follow-up request: "coloring should be different
+            // depending on item class (progression - green, normal - gray, trap -
+            // red)". Archipelago reports this on every ItemInfo regardless of which
+            // game the item belongs to -- see NotificationColors.ForItemFlags's own
+            // doc for why this replaced an earlier, narrower id-based check.
+            public readonly ItemFlags Flags;
+
+            public QueuedItem(long itemId, long locationId, string senderDisplayName, int senderSlot, ItemFlags flags, bool isCatchUp)
             {
                 ItemId = itemId;
                 LocationId = locationId;
                 SenderDisplayName = senderDisplayName;
+                SenderSlot = senderSlot;
+                Flags = flags;
                 IsCatchUp = isCatchUp;
             }
         }
@@ -100,7 +123,7 @@ namespace SuperhotArchipelago.Core
                         var item = helper.DequeueItem();
                         bool isCatchUp = DateTime.UtcNow - _connection.ConnectedAtUtc < CatchUpWindow;
                         string senderDisplayName = item.Player.Alias;
-                        _itemQueue.Enqueue(new QueuedItem(item.ItemId, item.LocationId, senderDisplayName, isCatchUp));
+                        _itemQueue.Enqueue(new QueuedItem(item.ItemId, item.LocationId, senderDisplayName, item.Player.Slot, item.Flags, isCatchUp));
                     }
                     catch (Exception ex)
                     {
@@ -175,7 +198,7 @@ namespace SuperhotArchipelago.Core
                     try
                     {
                         var item = _connection.Session.Items.DequeueItem();
-                        _itemQueue.Enqueue(new QueuedItem(item.ItemId, item.LocationId, item.Player.Alias, isCatchUp: true));
+                        _itemQueue.Enqueue(new QueuedItem(item.ItemId, item.LocationId, item.Player.Alias, item.Player.Slot, item.Flags, isCatchUp: true));
                     }
                     catch (Exception ex)
                     {
@@ -203,6 +226,13 @@ namespace SuperhotArchipelago.Core
         {
             long itemId = queued.ItemId;
 
+            // Real, explicit user follow-up request: "merge sends to self into one
+            // line" -- see QueuedItem.SenderSlot's own comment and Notify()'s below
+            // for the full reasoning. Computed once here (not per-branch) since every
+            // branch below that can call Notify() needs the same answer.
+            bool isSelfSend = _connection.Session != null
+                && queued.SenderSlot == _connection.Session.ConnectionInfo.Slot;
+
             if (itemId == 0)
             {
                 // Victory has code=None on the Python side, which the network layer
@@ -218,7 +248,7 @@ namespace SuperhotArchipelago.Core
                 // rather than falling through to the "unknown item id" warning below,
                 // which would otherwise fire on every single filler item received.
                 _log.Msg("Received 'White Space' -- filler, nothing to apply.");
-                Notify("White Space", queued.SenderDisplayName, queued.IsCatchUp, queued.LocationId);
+                Notify("White Space", queued.SenderDisplayName, queued.IsCatchUp, queued.LocationId, isSelfSend, queued.Flags);
                 return;
             }
 
@@ -234,7 +264,7 @@ namespace SuperhotArchipelago.Core
             // LevelCatalog.LevelEntry's comment for why scene name isn't safe to use.
             UnlockState.Unlock(level.LevelId);
             _log.Msg($"Unlocked '{level.DisplayName}' (level id {level.LevelId}, scene '{level.SceneName}') from a received item.");
-            Notify(level.DisplayName, queued.SenderDisplayName, queued.IsCatchUp, queued.LocationId);
+            Notify(level.DisplayName, queued.SenderDisplayName, queued.IsCatchUp, queued.LocationId, isSelfSend, queued.Flags);
 
             // The hub only re-evaluates locks when piOsMenu.LockUnfinishedLevels() runs
             // (see Patches/HubUnlockPatch.cs), which happens on its own triggers inside
@@ -245,8 +275,28 @@ namespace SuperhotArchipelago.Core
 
         /// <summary>
         /// Records (and, for genuinely live items, pops up) a "you received X"
-        /// notification. Real, explicit user request: the same text for both the log
-        /// and the popup, worded "Received [item] from [player]".
+        /// notification, worded "Received [item] from [player]" -- item and player each
+        /// in their own color (see Core/NotificationColors.cs), real, explicit user
+        /// request. The plain-text popup keeps the same wording (TextManager's native
+        /// uptitle queue can't render per-substring color -- see NotificationLog.Add's
+        /// own comment).
+        ///
+        /// Real, explicit user follow-up request: "merge sends to self into one line
+        /// 'Miikurb found their X'". isSelfSend means the location that granted this
+        /// item was our own check -- the exact same real-world event that just made
+        /// LocationManager.cs's ScoutAndQueueSentNotification/OnConnectedCore produce
+        /// their own single merged "X found their Y" line for it (comparing the same
+        /// sender/receiver slot equality this class does, just resolved from the
+        /// opposite side of the same item). Logging anything here too would be a
+        /// second, redundant line for one real event, so this returns immediately
+        /// instead -- live or catch-up, log or popup, all skipped. The one edge case
+        /// this can't cover: if LocationManager's own scout call happens to fail for
+        /// this location (a real network hiccup), its fallback message can't detect
+        /// self-send (it never gets scouted item/player data at all) and prints a
+        /// generic "Sent check for X" -- and since this method still returns early
+        /// here, no "Received" line appears in that case either. Rare and harmless
+        /// (nothing is lost from UnlockState, just one notification line stays
+        /// generic), not worth adding a second detection path for.
         ///
         /// Real bug found by live testing: catch-up entries from a reconnect's history
         /// resync were landing in the log as one solid block, all appearing well before
@@ -258,16 +308,35 @@ namespace SuperhotArchipelago.Core
         /// exact same location id numbering. Live entries keep the old plain-append
         /// behavior (NotificationLog.Add's 2-arg overload, i.e. long.MaxValue).
         /// </summary>
-        private void Notify(string itemDisplayName, string senderDisplayName, bool isCatchUp, long locationId)
+        private void Notify(string itemDisplayName, string senderDisplayName, bool isCatchUp, long locationId, bool isSelfSend, ItemFlags flags)
         {
+            if (isSelfSend)
+            {
+                return;
+            }
+
+            // Real bug found by the user's own follow-up report: this used to key
+            // color off a hardcoded "is this the White Space item" check, which only
+            // ever recognized this world's own two item kinds. Reading the real Flags
+            // Archipelago reports on every ItemInfo is correct for any item from any
+            // game -- see NotificationColors.ForItemFlags's own doc.
+            char itemColor = NotificationColors.ForItemFlags(flags);
+            var segments = new[]
+            {
+                new LogSegment("Received ", NotificationColors.Default),
+                new LogSegment(itemDisplayName, itemColor),
+                new LogSegment(" from ", NotificationColors.Default),
+                new LogSegment(senderDisplayName, NotificationColors.Player),
+            };
             string text = $"Received {itemDisplayName} from {senderDisplayName}";
+
             if (isCatchUp)
             {
-                NotificationLog.Add(text, null, locationId);
+                NotificationLog.Add(segments, null, locationId);
             }
             else
             {
-                NotificationLog.Add(text, text);
+                NotificationLog.Add(segments, text);
             }
         }
     }

@@ -3,6 +3,26 @@ using System.Collections.Generic;
 namespace SuperhotArchipelago.Core
 {
     /// <summary>
+    /// One colored run of text within a single notification log line. Real, explicit
+    /// user request: "See if we can color check received similar to text client" --
+    /// a plain flat string per line (the original design) can't represent that, since
+    /// a single line needs its item name, player name, and connective words each in
+    /// their own color. See Core/NotificationColors.cs for the actual palette and why
+    /// it's limited to what SUPERHOT's native renderer supports.
+    /// </summary>
+    public readonly struct LogSegment
+    {
+        public readonly string Text;
+        public readonly char Color;
+
+        public LogSegment(string text, char color)
+        {
+            Text = text;
+            Color = color;
+        }
+    }
+
+    /// <summary>
     /// Real, explicit user request: "a popup while the user is playing to show recent
     /// checks pertaining to them. I also [want] a log section in the hub to see older
     /// notifications" -- scoped to items received and the player's own checks sent (not
@@ -36,7 +56,12 @@ namespace SuperhotArchipelago.Core
         // LevelCatalog), so this is never expected to actually trigger.
         private const int MaxEntries = 200;
 
-        private static readonly List<string> _entries = new();
+        // Real, explicit user request: "See if we can color check received similar to
+        // text client" -- each entry is now an array of colored segments rather than a
+        // plain string, so ArchipelagoLogApp.cs can render "Sent Level Access: X to Y"
+        // with the item and player names in their own colors instead of one flat line.
+        // See LogSegment's own doc above.
+        private static readonly List<LogSegment[]> _entries = new();
 
         // Real bug found by live testing: the log was showing every "Received" entry
         // from a reconnect's history resync as one solid block, followed much later by
@@ -98,36 +123,47 @@ namespace SuperhotArchipelago.Core
         // up individually during a big burst.
         private const int MaxPendingPopups = 4;
 
-        /// <summary>Full log text, oldest first -- what Core/ArchipelagoLogApp.cs renders.</summary>
-        public static IReadOnlyList<string> Entries => _entries;
+        /// <summary>Full log entries, oldest first -- what Core/ArchipelagoLogApp.cs renders.</summary>
+        public static IReadOnlyList<LogSegment[]> Entries => _entries;
 
         /// <summary>
         /// Records one log line, and -- if popupText is non-null -- also queues it as an
         /// in-game popup. Callers pass null for popupText for anything that shouldn't
         /// interrupt play (history being replayed/resynced on connect; see
-        /// ItemManager.cs/LocationManager.cs), and real display text otherwise.
+        /// ItemManager.cs/LocationManager.cs), and real display text otherwise. popupText
+        /// itself stays a plain string -- TextManager's native uptitle queue is a single
+        /// flat string with no per-substring color support (see LogSegment's own doc),
+        /// so only the log screen ever gets the colored version.
         ///
         /// Defaults orderKey to long.MaxValue -- plain chronological append, correct for
         /// any genuinely live event, which is every caller except the two historical
         /// resync loops (see the 3-arg overload below and _entryOrderKeys' own comment).
         /// </summary>
-        public static void Add(string logText, string? popupText) => Add(logText, popupText, long.MaxValue);
+        public static void Add(LogSegment[] segments, string? popupText) => Add(segments, popupText, long.MaxValue);
 
         /// <summary>
-        /// Same as Add(string, string?) above, but inserts the entry in ascending
+        /// Convenience overload for callers with nothing worth coloring (error/fallback
+        /// messages) -- wraps the whole line as one default-colored segment rather than
+        /// making every call site build a one-element array by hand.
+        /// </summary>
+        public static void Add(string plainText, string? popupText) =>
+            Add(new[] { new LogSegment(plainText, NotificationColors.Default) }, popupText, long.MaxValue);
+
+        /// <summary>
+        /// Same as Add(LogSegment[], string?) above, but inserts the entry in ascending
         /// orderKey position among other entries rather than always appending -- see
         /// _entryOrderKeys' own comment for why this exists. Historical/catch-up callers
         /// pass a real Archipelago location id here; everything else should keep using
         /// the 2-arg overload (which passes long.MaxValue, i.e. "always append last").
         /// </summary>
-        public static void Add(string logText, string? popupText, long orderKey)
+        public static void Add(LogSegment[] segments, string? popupText, long orderKey)
         {
             int insertIndex = _entries.Count;
             while (insertIndex > 0 && _entryOrderKeys[insertIndex - 1] > orderKey)
             {
                 insertIndex--;
             }
-            _entries.Insert(insertIndex, logText);
+            _entries.Insert(insertIndex, segments);
             _entryOrderKeys.Insert(insertIndex, orderKey);
             while (_entries.Count > MaxEntries)
             {

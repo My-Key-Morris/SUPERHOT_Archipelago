@@ -35,7 +35,7 @@ namespace SuperhotArchipelago.Core
         // ItemManager's own (synchronous) resync -- see NotificationLog's own
         // _entryOrderKeys comment for the full root cause. Live entries pass
         // long.MaxValue (plain append, same behavior as before this fix).
-        private readonly ConcurrentQueue<(string LogText, string? PopupText, long OrderKey)> _pendingNotifications = new();
+        private readonly ConcurrentQueue<(LogSegment[] Segments, string? PopupText, long OrderKey)> _pendingNotifications = new();
 
         public LocationManager(ArchipelagoConnection connection, MelonLogger.Instance log)
         {
@@ -113,13 +113,45 @@ namespace SuperhotArchipelago.Core
                     try
                     {
                         string itemName = LevelCatalog.TryGetShortItemDisplayName(kvp.Value.ItemId) ?? kvp.Value.ItemDisplayName;
-                        string logText = $"Sent {itemName} to {kvp.Value.Player.Alias} " +
-                            $"from {ResolveLocationDisplayText(kvp.Key)}";
+
+                        // Real bug found by the user's own follow-up report: this used
+                        // to key color off `ItemId == WhiteSpaceItemId`, which only
+                        // ever recognizes this world's own two item kinds. Reading the
+                        // real `Flags` Archipelago reports on every scouted item is
+                        // correct for any item from any game in the multiworld -- see
+                        // NotificationColors.ForItemFlags's own doc.
+                        char itemColor = NotificationColors.ForItemFlags(kvp.Value.Flags);
+
+                        // Real, explicit user follow-up request: "merge sends to self
+                        // into one line" -- see ScoutAndQueueSentNotification's own
+                        // comment for the full reasoning; this historical/catch-up
+                        // path needs the exact same check so a reconnect's rebuilt log
+                        // shows one "X found their Y" line per self-checked location,
+                        // not the two separate "Sent"/"Received" lines it used to.
+                        bool isSelfSend = _connection.Session != null
+                            && kvp.Value.Player.Slot == _connection.Session.ConnectionInfo.Slot;
+
+                        LogSegment[] segments = isSelfSend
+                            ? new[]
+                              {
+                                  new LogSegment(kvp.Value.Player.Alias, NotificationColors.Player),
+                                  new LogSegment(" found their ", NotificationColors.Default),
+                                  new LogSegment(itemName, itemColor),
+                              }
+                            : new[]
+                              {
+                                  new LogSegment("Sent ", NotificationColors.Default),
+                                  new LogSegment(itemName, itemColor),
+                                  new LogSegment(" to ", NotificationColors.Default),
+                                  new LogSegment(kvp.Value.Player.Alias, NotificationColors.Player),
+                                  new LogSegment($" from {ResolveLocationDisplayText(kvp.Key)}", NotificationColors.Default),
+                              };
+
                         // kvp.Key is this location's own Archipelago id -- same sort-key
                         // scale ItemManager.cs's Notify() uses via ItemInfo.LocationId, so
                         // this entry lands right beside the matching "Received" entry for
                         // whatever item this location actually granted.
-                        _pendingNotifications.Enqueue((logText, null, kvp.Key));
+                        _pendingNotifications.Enqueue((segments, null, kvp.Key));
                     }
                     catch (System.Exception ex)
                     {
@@ -139,7 +171,7 @@ namespace SuperhotArchipelago.Core
         {
             while (_pendingNotifications.TryDequeue(out var pending))
             {
-                NotificationLog.Add(pending.LogText, pending.PopupText, pending.OrderKey);
+                NotificationLog.Add(pending.Segments, pending.PopupText, pending.OrderKey);
             }
         }
 
@@ -309,6 +341,17 @@ namespace SuperhotArchipelago.Core
         /// still produces *some* notification rather than silently vanishing. Callers
         /// pass the level's own display name for a main completion, or "X Secret" for
         /// a secret check -- see CheckLocation/CheckSecretLocation's own call sites.
+        ///
+        /// Real, explicit user follow-up request: "merge sends to self into one line
+        /// 'Miikurb found their X'". scouted.Player is "the player to receive the
+        /// item" (confirmed via the Archipelago.MultiClient.Net.dll source docs) --
+        /// comparing its Slot against our own (Session.ConnectionInfo.Slot) is what
+        /// detects "the check I just made happened to contain my own item." When true,
+        /// this produces the merged wording instead of "Sent X to Y" -- see
+        /// ItemManager.cs's own Notify() for the other half of this fix, which skips
+        /// its "Received" line entirely for the exact same event (same slot-equality
+        /// check, resolved from the opposite side of the same item), leaving this the
+        /// only line either side ever produces for a self-send.
         /// </summary>
         private void ScoutAndQueueSentNotification(long locationId, string locationDisplayText, bool isLive)
         {
@@ -331,7 +374,7 @@ namespace SuperhotArchipelago.Core
                 try
                 {
                     string popupText;
-                    string logText;
+                    LogSegment[] segments;
                     if (!task.IsFaulted && !task.IsCanceled && task.Result != null &&
                         task.Result.TryGetValue(locationId, out ScoutedItemInfo scouted))
                     {
@@ -341,27 +384,60 @@ namespace SuperhotArchipelago.Core
                         // this trades AP's own "Level Access: X" item name for this
                         // mod's shorter catalog one wherever it's recognized.
                         string itemName = LevelCatalog.TryGetShortItemDisplayName(scouted.ItemId) ?? scouted.ItemDisplayName;
-                        popupText = $"Sent {itemName} to {scouted.Player.Alias}";
 
-                        // Real, explicit user request: show which location the check
-                        // came from, but log only -- popupText above stays exactly
-                        // what fits a quick glance, logText gets the extra context
-                        // since the log screen has room for it.
-                        logText = $"{popupText} from {locationDisplayText}";
+                        // Same fix as OnConnectedCore's historical loop above -- real
+                        // Flags, not an id check that only knows this world's own two
+                        // item kinds. See NotificationColors.ForItemFlags's own doc.
+                        char itemColor = NotificationColors.ForItemFlags(scouted.Flags);
+
+                        bool isSelfSend = _connection.Session != null
+                            && scouted.Player.Slot == _connection.Session.ConnectionInfo.Slot;
+
+                        if (isSelfSend)
+                        {
+                            // No location suffix here, live or log -- matches the
+                            // user's own example wording exactly ("Miikurb found
+                            // their X"), and a self-send's location is always this
+                            // player's own current check anyway, not new information.
+                            popupText = $"{scouted.Player.Alias} found their {itemName}";
+                            segments = new[]
+                            {
+                                new LogSegment(scouted.Player.Alias, NotificationColors.Player),
+                                new LogSegment(" found their ", NotificationColors.Default),
+                                new LogSegment(itemName, itemColor),
+                            };
+                        }
+                        else
+                        {
+                            popupText = $"Sent {itemName} to {scouted.Player.Alias}";
+
+                            // Real, explicit user request: show which location the
+                            // check came from, but log only -- popupText above stays
+                            // exactly what fits a quick glance, the log segment gets
+                            // the extra context since the log screen has room for it.
+                            segments = new[]
+                            {
+                                new LogSegment("Sent ", NotificationColors.Default),
+                                new LogSegment(itemName, itemColor),
+                                new LogSegment(" to ", NotificationColors.Default),
+                                new LogSegment(scouted.Player.Alias, NotificationColors.Player),
+                                new LogSegment($" from {locationDisplayText}", NotificationColors.Default),
+                            };
+                        }
                     }
                     else
                     {
                         _log.Warning($"Failed to scout location {locationId} for a notification -- " +
                             "showing a generic message instead.");
                         popupText = $"Sent check for {locationDisplayText}";
-                        logText = popupText;
+                        segments = new[] { new LogSegment(popupText, NotificationColors.Default) };
                     }
 
                     // Always a genuinely live event here (see class doc / call sites) --
                     // long.MaxValue keeps this a plain append in true real-time order,
                     // same as before this fix. Only the history-resync path above (which
                     // never calls this method) needs a real location-id order key.
-                    _pendingNotifications.Enqueue((logText, isLive ? popupText : null, long.MaxValue));
+                    _pendingNotifications.Enqueue((segments, isLive ? popupText : null, long.MaxValue));
                 }
                 catch (System.Exception ex)
                 {

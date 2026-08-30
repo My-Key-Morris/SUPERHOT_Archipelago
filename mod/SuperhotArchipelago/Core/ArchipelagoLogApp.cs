@@ -44,7 +44,20 @@ namespace SuperhotArchipelago.Core
         // more room before truncation kicks in at all.
         private const int LineWidth = 58;
 
-        private readonly SHGUItext[] _lines = new SHGUItext[VisibleLines];
+        // Real, explicit user request: "See if we can color check received similar to
+        // text client" -- one flat SHGUItext per row can only ever show one color, so
+        // each row is now MaxSegmentsPerLine separate child SHGUItext instances glued
+        // together at increasing x-offsets instead of one. Confirmed via decompile that
+        // SHGUIcommanderbutton already does exactly this (a prefix drawn directly, plus
+        // a separate suffix SHGUItext at a fixed local x) to get two colors on one row
+        // -- this generalizes that same trick to however many segments one line needs.
+        // 6 comfortably covers every format this mod actually builds today (the longest,
+        // a "Sent" line, is 5: "Sent "/item/" to "/player/" from X") with one spare slot
+        // rather than being sized exactly to the current maximum.
+        private const int MaxSegmentsPerLine = 6;
+        private const int BaseX = 3;
+
+        private readonly SHGUItext[][] _lineSegments = new SHGUItext[VisibleLines][];
         private readonly SHGUItext _footer;
 
         private int _scrollOffset;
@@ -57,16 +70,22 @@ namespace SuperhotArchipelago.Core
         // game's own title conventions.
         public ArchipelagoLogApp() : base("LOG")
         {
-            const int x = 3;
             int y = 3;
             for (int i = 0; i < VisibleLines; i++)
             {
-                _lines[i] = (AddSubView(new SHGUItext("", x, y, 'w')) as SHGUItext)!;
+                _lineSegments[i] = new SHGUItext[MaxSegmentsPerLine];
+                for (int s = 0; s < MaxSegmentsPerLine; s++)
+                {
+                    // x gets overwritten per-segment every RefreshDisplay -- BaseX here
+                    // is just a harmless starting value for a slot that starts empty
+                    // (empty text draws nothing regardless of x).
+                    _lineSegments[i][s] = (AddSubView(new SHGUItext("", BaseX, y, 'w')) as SHGUItext)!;
+                }
                 y += 1;
             }
 
             y += 1;
-            _footer = (AddSubView(new SHGUItext("", x, y, 'z')) as SHGUItext)!;
+            _footer = (AddSubView(new SHGUItext("", BaseX, y, 'z')) as SHGUItext)!;
 
             RefreshDisplay();
         }
@@ -114,8 +133,8 @@ namespace SuperhotArchipelago.Core
             // NotificationLog.Entries is oldest-first; reversed here so the newest entry
             // is always index 0 -- see class doc for why newest-first is the more useful
             // default view.
-            IReadOnlyList<string> oldestFirst = NotificationLog.Entries;
-            var newestFirst = new List<string>(oldestFirst.Count);
+            IReadOnlyList<LogSegment[]> oldestFirst = NotificationLog.Entries;
+            var newestFirst = new List<LogSegment[]>(oldestFirst.Count);
             for (int i = oldestFirst.Count - 1; i >= 0; i--)
             {
                 newestFirst.Add(oldestFirst[i]);
@@ -126,15 +145,15 @@ namespace SuperhotArchipelago.Core
                 int entryIndex = _scrollOffset + i;
                 if (entryIndex < newestFirst.Count)
                 {
-                    _lines[i].text = Truncate(newestFirst[entryIndex]);
+                    SetRowSegments(i, newestFirst[entryIndex]);
                 }
                 else if (entryIndex == 0)
                 {
-                    _lines[i].text = "No notifications yet.";
+                    SetRowSegments(i, new[] { new LogSegment("No notifications yet.", NotificationColors.Default) });
                 }
                 else
                 {
-                    _lines[i].text = "";
+                    SetRowSegments(i, System.Array.Empty<LogSegment>());
                 }
             }
 
@@ -144,9 +163,62 @@ namespace SuperhotArchipelago.Core
                   $"{System.Math.Min(_scrollOffset + VisibleLines, newestFirst.Count)} of {newestFirst.Count})";
         }
 
-        private static string Truncate(string text)
+        /// <summary>
+        /// Lays one entry's colored segments across a row's pre-allocated SHGUItext
+        /// slots, left to right, each positioned right after the previous one's text
+        /// ends (character-cell coordinates -- confirmed via decompile that SHGUI's
+        /// DrawText is a plain fixed-width grid, one cell per character, so
+        /// `next.x = prev.x + prev.text.Length` glues them with no gap or overlap).
+        /// Truncates the combined line to LineWidth exactly like the old single-string
+        /// Truncate() did, just spread across however many segments it takes to reach
+        /// that budget instead of one -- a segment that would overflow gets cut short
+        /// with "..." appended (matching the old behavior), and everything after it is
+        /// dropped. Any slots beyond what this entry needs are cleared so a shorter
+        /// entry can't leave a previous, longer one's tail-end segments on screen.
+        /// </summary>
+        private void SetRowSegments(int rowIndex, LogSegment[] segments)
         {
-            return text.Length <= LineWidth ? text : text.Substring(0, LineWidth - 3) + "...";
+            SHGUItext[] slots = _lineSegments[rowIndex];
+            int cellsUsed = 0;
+            int slotIndex = 0;
+
+            foreach (LogSegment segment in segments)
+            {
+                if (slotIndex >= slots.Length)
+                {
+                    // Ran out of segment slots -- shouldn't happen given
+                    // MaxSegmentsPerLine's own comment, but dropping the rest is far
+                    // safer than an index-out-of-range crash over one long entry.
+                    break;
+                }
+
+                int remaining = LineWidth - cellsUsed;
+                string text;
+                if (remaining <= 0)
+                {
+                    text = "";
+                }
+                else if (segment.Text.Length <= remaining)
+                {
+                    text = segment.Text;
+                }
+                else
+                {
+                    text = remaining <= 3 ? segment.Text.Substring(0, remaining) : segment.Text.Substring(0, remaining - 3) + "...";
+                }
+
+                SHGUItext slot = slots[slotIndex];
+                slot.x = BaseX + cellsUsed;
+                slot.color = segment.Color;
+                slot.text = text;
+                cellsUsed += text.Length;
+                slotIndex++;
+            }
+
+            for (; slotIndex < slots.Length; slotIndex++)
+            {
+                slots[slotIndex].text = "";
+            }
         }
     }
 }
