@@ -570,6 +570,34 @@ namespace SuperhotArchipelago.Core
         }
 
         /// <summary>
+        /// Every level that can actually count toward the "34 - Free" gate: every
+        /// tracked level except Free itself, and except anything ExcludeSlowLevels
+        /// marked excluded (an excluded level was never a real check the player could
+        /// send in the first place -- see CheckLocation -- so it can't count toward
+        /// this any more than Free's own play counts toward itself). Shared by
+        /// CountOtherLevelsCompleted (the numerator) and GetLevelsRequiredForFree (the
+        /// denominator, effectively) below, so the two can never define "other levels"
+        /// differently from each other.
+        /// </summary>
+        private IEnumerable<LevelEntry> OtherTrackedLevels()
+        {
+            foreach (LevelEntry level in LevelCatalog.Levels)
+            {
+                if (level.Order == LevelCatalog.Levels.Count)
+                {
+                    continue;
+                }
+
+                if (_connection.IsLevelExcluded(level.Order))
+                {
+                    continue;
+                }
+
+                yield return level;
+            }
+        }
+
+        /// <summary>
         /// How many of the other 31 story levels (every tracked level except "34 -
         /// Free" itself) have actually had their completion check sent this run.
         /// Used by Core/LevelAccessGuard.cs to gate entry to Free, and by
@@ -582,29 +610,39 @@ namespace SuperhotArchipelago.Core
         public int CountOtherLevelsCompleted()
         {
             int count = 0;
-            foreach (LevelEntry level in LevelCatalog.Levels)
+            foreach (LevelEntry level in OtherTrackedLevels())
             {
-                if (level.Order == LevelCatalog.Levels.Count)
-                {
-                    continue;
-                }
-
-                // Real, explicit user request (ExcludeSlowLevels): an excluded level was
-                // never a real check the player could send in the first place (see
-                // CheckLocation) -- it shouldn't count toward Free's "other levels
-                // completed" requirement any more than Free's own play counts toward
-                // itself, immediately above.
-                if (_connection.IsLevelExcluded(level.Order))
-                {
-                    continue;
-                }
-
                 if (IsLevelCompleted(level.LevelId))
                 {
                     count++;
                 }
             }
             return count;
+        }
+
+        /// <summary>
+        /// Real bug found by a direct user question ("does levels_required_for_free
+        /// account for excluded levels?"): it didn't. ArchipelagoConnection.LevelsRequiredForFree
+        /// is a flat number straight from the YAML (0-31, default 25) with no idea
+        /// ExcludeSlowLevels exists -- CountOtherLevelsCompleted() above already
+        /// correctly refuses to count an excluded level toward it, but nothing clamped
+        /// the *target* down to match. A player who set a high requirement (say 30)
+        /// while also excluding levels (which caps the real achievable count at 31
+        /// minus however many are excluded -- as few as 27 with all four excluded)
+        /// could end up with a target CountOtherLevelsCompleted() can mathematically
+        /// never reach: a genuine, permanent softlock on the real ending.
+        ///
+        /// Clamps the configured requirement down to OtherTrackedLevels().Count() --
+        /// the real maximum achievable given this room's own exclusions -- so the gate
+        /// can always eventually be satisfied. Core/LevelAccessGuard.cs's actual
+        /// enforcement and Patches/HubUnlockPatch.cs's "X/Y" progress display both call
+        /// this instead of reading ArchipelagoConnection.LevelsRequiredForFree
+        /// directly, so the enforced gate and what's shown to the player can never
+        /// quietly disagree with each other.
+        /// </summary>
+        public int GetLevelsRequiredForFree()
+        {
+            return System.Math.Min(_connection.LevelsRequiredForFree, OtherTrackedLevels().Count());
         }
     }
 }

@@ -144,7 +144,12 @@ namespace SuperhotArchipelago.Core
             // this second check.
             if (entry.Order == LevelCatalog.Levels.Count)
             {
-                int required = Mod.Connection?.LevelsRequiredForFree ?? 0;
+                // Real bug found by a direct user question: the raw YAML value here
+                // doesn't know about ExcludeSlowLevels and can ask for more completions
+                // than are mathematically possible once some levels are excluded --
+                // GetLevelsRequiredForFree() clamps it down to what's actually
+                // achievable. See that method's own doc for the full explanation.
+                int required = Mod.Locations?.GetLevelsRequiredForFree() ?? 0;
                 int completed = Mod.Locations?.CountOtherLevelsCompleted() ?? 0;
 
                 if (completed < required)
