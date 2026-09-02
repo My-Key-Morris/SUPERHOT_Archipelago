@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using BepInEx.Logging;
+using MelonLoader;
 using Newtonsoft.Json.Linq;
 
 namespace SuperhotArchipelago.Core
@@ -57,12 +57,12 @@ namespace SuperhotArchipelago.Core
         // is unique per level instance even when SceneName repeats.
         public static Dictionary<int, LevelEntry> LevelIdToLevel { get; private set; } = new();
 
-        public static void Load(ManualLogSource log)
+        public static void Load(MelonLogger.Instance log)
         {
             string path = Path.Combine(Path.GetDirectoryName(typeof(LevelCatalog).Assembly.Location)!, "data", "levels.json");
             if (!File.Exists(path))
             {
-                log.LogError($"levels.json not found at '{path}' -- location/item id mapping will be empty.");
+                log.Error($"levels.json not found at '{path}' -- location/item id mapping will be empty.");
                 return;
             }
 
@@ -93,7 +93,7 @@ namespace SuperhotArchipelago.Core
                 LevelIdToLevel[entry.LevelId] = entry;
             }
 
-            log.LogInfo($"LevelCatalog loaded {Levels.Count} levels from '{path}'.");
+            log.Msg($"LevelCatalog loaded {Levels.Count} levels from '{path}'.");
         }
 
         /// <summary>

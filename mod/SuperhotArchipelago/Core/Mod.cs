@@ -1,116 +1,96 @@
 using System;
-using BepInEx;
-using BepInEx.Logging;
-using HarmonyLib;
-using UnityEngine.SceneManagement;
-using AppConfig = SuperhotArchipelago.Core.Config;
+using MelonLoader;
+
+// Matches the strings in SH_Data/app.info exactly.
+[assembly: MelonInfo(typeof(SuperhotArchipelago.Core.Mod), "SuperhotArchipelago", "0.1.1", "Michael")]
+[assembly: MelonGame("SUPERHOT_Team", "SUPERHOT")]
 
 namespace SuperhotArchipelago.Core
 {
     /// <summary>
-    /// Mod entry point. Lifecycle: Awake (BepInEx's own equivalent of MelonLoader's
-    /// OnInitializeMelon), then Update every frame (BaseUnityPlugin is itself a MonoBehaviour,
-    /// so Unity calls this directly -- no OnUpdate override to implement). Level completion is
-    /// detected via Harmony patches (see ../Patches/), not scene-load events, since SUPERHOT
-    /// reuses scene names across multiple story beats. BepInEx has no built-in
-    /// "OnSceneWasLoaded" the way MelonMod did, so this subscribes to Unity's own
-    /// SceneManager.sceneLoaded event in Awake() instead.
-    ///
-    /// Note the "AppConfig" alias for Core.Config above: BaseUnityPlugin already declares its
-    /// own instance property named "Config" (the BepInEx ConfigFile), which would otherwise
-    /// hide this project's own static Config class everywhere in this file.
+    /// Mod entry point. Lifecycle: OnEarlyInitializeMelon -> OnInitializeMelon -> OnLateInitializeMelon,
+    /// then OnUpdate every frame. Level completion is detected via Harmony patches (see ../Patches/),
+    /// not OnSceneWasLoaded, since SUPERHOT reuses scene names across multiple story beats.
     /// </summary>
-    [BepInPlugin("com.michael.superhotarchipelago", "SuperhotArchipelago", "0.1.1")]
-    public class Mod : BaseUnityPlugin
+    public class Mod : MelonMod
     {
         public static ArchipelagoConnection? Connection { get; private set; }
         public static LocationManager? Locations { get; private set; }
         public static ItemManager? Items { get; private set; }
 
-        // Static so Harmony patches (static classes/methods, no Mod instance of their own)
-        // can still log through the same BepInEx console.
-        public static ManualLogSource? Log { get; private set; }
+        // Static so Harmony patches (static classes/methods, no MelonMod instance of their own)
+        // can still log through the same MelonLoader console.
+        public static MelonLogger.Instance? Log { get; private set; }
 
-        // Static self-reference so ArchipelagoConnectApp.cs (no Mod instance of its own)
+        // Static self-reference so ArchipelagoConnectApp.cs (no MelonMod instance of its own)
         // can reach TryConnect() via ApplyConnectionSettingsAndConnect.
         private static Mod? _instance;
 
         // Set during ApplyConnectionSettingsAndConnect's/SetEnabled's Config.*.Value writes so the
-        // SettingChanged auto-reconnect doesn't also fire a redundant connect/disconnect.
+        // OnEntryValueChanged auto-reconnect doesn't also fire a redundant connect/disconnect.
         private static bool _suppressAutoReconnect;
 
         // Lets players switch between Archipelago and vanilla play without reinstalling the mod.
         // Every gating/overlay/report patch checks this (directly or via LevelAccessGuard.ShouldBlock)
         // and no-ops when false; see Patches/ArchipelagoModeTogglePatch.cs for the hub toggle.
-        public static bool IsEnabled => AppConfig.Enabled.Value;
+        public static bool IsEnabled => Config.Enabled.Value;
 
         // IsEnabled only reflects config intent, not whether a connection actually succeeded (a
         // reconnect can fail silently and leave the toggle on). The save-data resync blocks in
-        // RunSceneWasLoadedBody need this instead, so they don't run against a null Session and
+        // OnSceneWasLoaded need this instead, so they don't run against a null Session and
         // overwrite real save data with false "not completed" reads.
         private static bool IsFullyConnected => Connection != null && Connection.IsConnected;
 
-        private void Awake()
+        public override void OnInitializeMelon()
         {
             _instance = this;
-            Log = Logger;
-            Logger.LogInfo("SuperhotArchipelago loading.");
+            Log = LoggerInstance;
+            LoggerInstance.Msg("SuperhotArchipelago loading.");
 
-            // MelonLoader auto-patches every [HarmonyPatch] in a mod's own assembly for you;
-            // BepInEx does not, so this call is the direct replacement -- without it, every
-            // patch in ../Patches/ (the ARCHIPELAGO hub folder, level gating, notifications,
-            // all of it) silently never applies, even though the patch code itself is unchanged.
-            new Harmony("com.michael.superhotarchipelago").PatchAll();
+            Config.Load();
+            LevelCatalog.Load(LoggerInstance);
 
-            AppConfig.Load(Config);
-            LevelCatalog.Load(Logger);
+            Connection = new ArchipelagoConnection(LoggerInstance);
+            Locations = new LocationManager(Connection, LoggerInstance);
+            Items = new ItemManager(Connection, LoggerInstance);
 
-            Connection = new ArchipelagoConnection(Logger);
-            Locations = new LocationManager(Connection, Logger);
-            Items = new ItemManager(Connection, Logger);
-
-            if (!AppConfig.Enabled.Value)
+            if (!Config.Enabled.Value)
             {
-                Logger.LogInfo("Not connecting yet: Archipelago mode is turned off. Click " +
+                LoggerInstance.Msg("Not connecting yet: Archipelago mode is turned off. Click " +
                     "the AP MODE icon on the hub's main screen to turn it back on.");
             }
-            else if (AppConfig.IsConfigured)
+            else if (Config.IsConfigured)
             {
                 TryConnect();
             }
             else
             {
-                Logger.LogInfo("Not connecting yet: Server/Slot not set. Click the " +
+                LoggerInstance.Msg("Not connecting yet: Server/Slot not set. Click the " +
                     "ARCHIPELAGO icon on the hub's main screen to open the connection menu " +
                     "and fill them in, or edit the [SuperhotArchipelago] section of " +
-                    "BepInEx/config/com.michael.superhotarchipelago.cfg directly " +
-                    "(Server/Slot/Password changes there also trigger a reconnect " +
-                    "automatically).");
+                    "UserData/MelonPreferences.cfg directly (Server/Slot/Password changes " +
+                    "there also trigger a reconnect automatically).");
             }
 
-            AppConfig.Server.SettingChanged += (_, _) => TryConnect();
-            AppConfig.Slot.SettingChanged += (_, _) => TryConnect();
-            AppConfig.Password.SettingChanged += (_, _) => TryConnect();
-            AppConfig.Enabled.SettingChanged += (_, _) => ApplyEnabledChange();
-
-            // BepInEx has no OnSceneWasLoaded lifecycle hook of its own (that was specific to
-            // MelonMod) -- Unity's own SceneManager.sceneLoaded event is the direct replacement.
-            SceneManager.sceneLoaded += (scene, _) => OnSceneWasLoaded(scene.buildIndex, scene.name);
+            Config.Server.OnEntryValueChanged.Subscribe((_, _) => TryConnect());
+            Config.Slot.OnEntryValueChanged.Subscribe((_, _) => TryConnect());
+            Config.Password.OnEntryValueChanged.Subscribe((_, _) => TryConnect());
+            Config.Enabled.OnEntryValueChanged.Subscribe((_, _) => ApplyEnabledChange());
         }
 
         private void TryConnect()
         {
-            if (_suppressAutoReconnect || !AppConfig.Enabled.Value || !AppConfig.IsConfigured)
+            if (_suppressAutoReconnect || !Config.Enabled.Value || !Config.IsConfigured)
             {
                 return;
             }
 
-            Logger.LogInfo($"Connecting to '{AppConfig.Server.Value}' as '{AppConfig.Slot.Value}'...");
-            Connection?.Connect(AppConfig.Server.Value, AppConfig.Slot.Value,
-                AppConfig.Password.Value == "" ? null : AppConfig.Password.Value);
+            LoggerInstance.Msg($"Connecting to '{Config.Server.Value}' as '{Config.Slot.Value}'...");
+            Connection?.Connect(Config.Server.Value, Config.Slot.Value,
+                Config.Password.Value == "" ? null : Config.Password.Value);
         }
 
-        // Called by the hub's AP MODE button. Suppresses the SettingChanged auto-apply
+        // Called by the hub's AP MODE button. Suppresses the OnEntryValueChanged auto-apply
         // the same way ApplyConnectionSettingsAndConnect does, so one click doesn't also
         // trigger a redundant connect/disconnect.
         public static void SetEnabled(bool enabled)
@@ -123,8 +103,8 @@ namespace SuperhotArchipelago.Core
             _suppressAutoReconnect = true;
             try
             {
-                AppConfig.Enabled.Value = enabled;
-                AppConfig.Save();
+                Config.Enabled.Value = enabled;
+                Config.Save();
             }
             finally
             {
@@ -134,8 +114,8 @@ namespace SuperhotArchipelago.Core
             ApplyEnabledChange();
         }
 
-        // Shared by SetEnabled (hub button) and the SettingChanged subscription (a live
-        // config file edit). Turning off drops any live connection rather than just
+        // Shared by SetEnabled (hub button) and the OnEntryValueChanged subscription (a live
+        // MelonPreferences.cfg edit). Turning off drops any live connection rather than just
         // stopping local gating; turning back on reconnects, which replays this slot's full
         // item history so UnlockState ends up correct with no extra bookkeeping.
         private static void ApplyEnabledChange()
@@ -145,14 +125,14 @@ namespace SuperhotArchipelago.Core
                 return;
             }
 
-            if (AppConfig.Enabled.Value)
+            if (Config.Enabled.Value)
             {
-                Log?.LogInfo("Archipelago mode turned ON.");
+                Log?.Msg("Archipelago mode turned ON.");
                 _instance?.TryConnect();
             }
             else
             {
-                Log?.LogInfo("Archipelago mode turned OFF -- SUPERHOT will play like vanilla until it's turned back on.");
+                Log?.Msg("Archipelago mode turned OFF -- SUPERHOT will play like vanilla until it's turned back on.");
                 Connection?.Disconnect();
             }
         }
@@ -170,15 +150,15 @@ namespace SuperhotArchipelago.Core
             _suppressAutoReconnect = true;
             try
             {
-                AppConfig.Server.Value = server;
-                AppConfig.Slot.Value = slot;
-                AppConfig.Password.Value = password;
+                Config.Server.Value = server;
+                Config.Slot.Value = slot;
+                Config.Password.Value = password;
 
                 // Submitting this screen also turns Archipelago mode back on if it was off,
                 // otherwise TryConnect() below would silently no-op.
-                AppConfig.Enabled.Value = true;
+                Config.Enabled.Value = true;
 
-                AppConfig.Save();
+                Config.Save();
             }
             finally
             {
@@ -188,11 +168,11 @@ namespace SuperhotArchipelago.Core
             _instance.TryConnect();
         }
 
-        private void Update()
+        public override void OnUpdate()
         {
             // Each call wrapped individually rather than one try/catch around the whole method,
             // so a step that throws is identified by name in the log instead of just "somewhere
-            // in Update" -- added after "Round 48"'s cold-boot freeze investigation showed how
+            // in OnUpdate" -- added after "Round 48"'s cold-boot freeze investigation showed how
             // easily a silent failure here (or in a Postfix a step calls into) can be mistaken
             // for a hang with zero diagnostic trail.
             RunStep("Items.ProcessQueue", () => Items?.ProcessQueue());
@@ -225,15 +205,15 @@ namespace SuperhotArchipelago.Core
             }
             catch (Exception ex)
             {
-                Logger.LogError($"[debug] Update step '{name}' threw: {ex}");
+                LoggerInstance.Error($"[debug] OnUpdate step '{name}' threw: {ex}");
             }
         }
 
-        private void OnSceneWasLoaded(int buildIndex, string sceneName)
+        public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
             // Debug aid for confirming levels.json's duplicate-scene-name caveats against
             // a real playthrough's actual scene order.
-            Logger.LogInfo($"Scene loaded: {sceneName} (buildIndex {buildIndex})");
+            LoggerInstance.Msg($"Scene loaded: {sceneName} (buildIndex {buildIndex})");
 
             // Wrapped in try/catch so one bad section (or an exception from a Postfix a section
             // calls into, e.g. HubUnlockPatch) can't silently abort the rest of scene-load
@@ -246,7 +226,7 @@ namespace SuperhotArchipelago.Core
             }
             catch (Exception ex)
             {
-                Logger.LogError($"OnSceneWasLoaded('{sceneName}') threw: {ex}");
+                LoggerInstance.Error($"OnSceneWasLoaded('{sceneName}') threw: {ex}");
             }
         }
 
@@ -297,7 +277,7 @@ namespace SuperhotArchipelago.Core
             LevelInfo current = LevelSetup.CurrentLevelInfo;
             if (sceneName != "SHMenu" && current != null && LevelAccessGuard.ShouldBlock(current, out string blockMessage))
             {
-                Logger.LogInfo($"Safety net: scene '{sceneName}' resolved to a locked level " +
+                LoggerInstance.Msg($"Safety net: scene '{sceneName}' resolved to a locked level " +
                     "that no launch-time gate caught -- kicking back to hub.");
 
                 if (SHGUI.current != null)

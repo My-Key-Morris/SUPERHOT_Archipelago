@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Archipelago.MultiClient.Net.Enums;
 using Archipelago.MultiClient.Net.Models;
-using BepInEx.Logging;
+using MelonLoader;
 
 namespace SuperhotArchipelago.Core
 {
@@ -14,7 +14,7 @@ namespace SuperhotArchipelago.Core
     public class LocationManager
     {
         private readonly ArchipelagoConnection _connection;
-        private readonly ManualLogSource _log;
+        private readonly MelonLogger.Instance _log;
 
         // Item/receiver for a "Sent X to Y" notification aren't known until ScoutLocationsAsync
         // resolves them off the main thread, so results are queued here for ProcessPendingNotifications()
@@ -22,7 +22,7 @@ namespace SuperhotArchipelago.Core
         // entry instead of always landing at the end (see NotificationLog._entryOrderKeys).
         private readonly ConcurrentQueue<(LogSegment[] Segments, string? PopupText, long OrderKey)> _pendingNotifications = new();
 
-        public LocationManager(ArchipelagoConnection connection, ManualLogSource log)
+        public LocationManager(ArchipelagoConnection connection, MelonLogger.Instance log)
         {
             _connection = connection;
             _log = log;
@@ -44,7 +44,7 @@ namespace SuperhotArchipelago.Core
             }
             catch (System.Exception ex)
             {
-                _log.LogError($"LocationManager.OnConnected failed, notification history resync " +
+                _log.Error($"LocationManager.OnConnected failed, notification history resync " +
                     $"skipped for this connection: {ex}");
             }
         }
@@ -70,7 +70,7 @@ namespace SuperhotArchipelago.Core
             {
                 if (task.IsFaulted || task.IsCanceled || task.Result == null)
                 {
-                    _log.LogWarning("Failed to scout this slot's already-checked locations -- " +
+                    _log.Warning("Failed to scout this slot's already-checked locations -- " +
                         "the AP LOG screen won't show full history until the next successful reconnect.");
                     return;
                 }
@@ -112,7 +112,7 @@ namespace SuperhotArchipelago.Core
                     }
                     catch (System.Exception ex)
                     {
-                        _log.LogError($"Processing one scouted historical location threw -- it may be " +
+                        _log.Error($"Processing one scouted historical location threw -- it may be " +
                             $"missing from the AP LOG, but every other entry is unaffected: {ex}");
                     }
                 }
@@ -136,13 +136,13 @@ namespace SuperhotArchipelago.Core
         {
             if (_connection.Session == null || !_connection.IsConnected)
             {
-                _log.LogWarning($"CheckLocation({levelId}) called before connecting -- ignored.");
+                _log.Warning($"CheckLocation({levelId}) called before connecting -- ignored.");
                 return;
             }
 
             if (!LevelCatalog.LevelIdToLevel.TryGetValue(levelId, out LevelEntry? level))
             {
-                _log.LogWarning($"Unknown level id {levelId} -- no matching entry in levels.json. " +
+                _log.Warning($"Unknown level id {levelId} -- no matching entry in levels.json. " +
                               "Either a level outside our catalog just finished, or levels.json's " +
                               "order/id list is out of sync with the real game.");
                 return;
@@ -160,12 +160,12 @@ namespace SuperhotArchipelago.Core
                 // against resending a check or duplicate notification.
                 if (_connection.Session.Locations.AllLocationsChecked.Contains(locationId))
                 {
-                    _log.LogInfo($"'{level.DisplayName}' already checked -- skipping duplicate check/notification.");
+                    _log.Msg($"'{level.DisplayName}' already checked -- skipping duplicate check/notification.");
                 }
                 else
                 {
                     _connection.Session.Locations.CompleteLocationChecks(locationId);
-                    _log.LogInfo($"Sent check for '{level.DisplayName}' (level id {levelId}, location id {locationId}).");
+                    _log.Msg($"Sent check for '{level.DisplayName}' (level id {levelId}, location id {locationId}).");
 
                     // A sent check is always a genuinely live event (only fires from real gameplay), so it always
                     // gets a popup, not just a log entry.
@@ -179,7 +179,7 @@ namespace SuperhotArchipelago.Core
             if (level.Order == LevelCatalog.Levels.Count)
             {
                 _connection.Session.SetGoalAchieved();
-                _log.LogInfo($"'{level.DisplayName}' was the final level -- reported goal achieved.");
+                _log.Msg($"'{level.DisplayName}' was the final level -- reported goal achieved.");
 
                 // Unlocks the native MODS folder, which requires SaveManager's "storyFinished" flag -- normally
                 // only set by "22 - Hacker"'s scripted ending scene, which an AP run may skip or never revisit.
@@ -197,13 +197,13 @@ namespace SuperhotArchipelago.Core
         {
             if (_connection.Session == null || !_connection.IsConnected)
             {
-                _log.LogWarning($"CheckSecretLocation({levelId}) called before connecting -- ignored.");
+                _log.Warning($"CheckSecretLocation({levelId}) called before connecting -- ignored.");
                 return;
             }
 
             if (!LevelCatalog.LevelIdToLevel.TryGetValue(levelId, out LevelEntry? level))
             {
-                _log.LogWarning($"Unknown level id {levelId} for a secret find -- no matching entry in " +
+                _log.Warning($"Unknown level id {levelId} for a secret find -- no matching entry in " +
                               "levels.json. Either a level outside our catalog has a secret we don't " +
                               "know about, or levels.json's order/id list is out of sync with the real game.");
                 return;
@@ -211,7 +211,7 @@ namespace SuperhotArchipelago.Core
 
             if (!level.HasSecret)
             {
-                _log.LogWarning($"Secret found in '{level.DisplayName}', but levels.json says this level " +
+                _log.Warning($"Secret found in '{level.DisplayName}', but levels.json says this level " +
                               "has none -- sending the check anyway, but this likely means levels.json's " +
                               "hasSecret is out of sync with the real game.");
             }
@@ -219,7 +219,7 @@ namespace SuperhotArchipelago.Core
             // An excluded level's secret location doesn't exist either (see CheckLocation's matching check).
             if (_connection.IsLevelExcluded(level.Order))
             {
-                _log.LogInfo($"'{level.DisplayName}' secret found, but this level is excluded from " +
+                _log.Msg($"'{level.DisplayName}' secret found, but this level is excluded from " +
                     "tracking (ExcludeSlowLevels) -- no check to send.");
                 return;
             }
@@ -230,12 +230,12 @@ namespace SuperhotArchipelago.Core
             // check or notification.
             if (_connection.Session.Locations.AllLocationsChecked.Contains(locationId))
             {
-                _log.LogInfo($"'{level.DisplayName}' secret already checked -- skipping duplicate check/notification.");
+                _log.Msg($"'{level.DisplayName}' secret already checked -- skipping duplicate check/notification.");
                 return;
             }
 
             _connection.Session.Locations.CompleteLocationChecks(locationId);
-            _log.LogInfo($"Sent secret check for '{level.DisplayName}' (level id {levelId}, location id {locationId}).");
+            _log.Msg($"Sent secret check for '{level.DisplayName}' (level id {levelId}, location id {locationId}).");
 
             // Always a genuinely live event, like CheckLocation's own call. Appending "Secret" distinguishes
             // this from a main-completion check in the log's "from X" suffix.
@@ -307,7 +307,7 @@ namespace SuperhotArchipelago.Core
                     }
                     else
                     {
-                        _log.LogWarning($"Failed to scout location {locationId} for a notification -- " +
+                        _log.Warning($"Failed to scout location {locationId} for a notification -- " +
                             "showing a generic message instead.");
                         popupText = $"Sent check for {locationDisplayText}";
                         segments = new[] { new LogSegment(popupText, NotificationColors.Default) };
@@ -322,7 +322,7 @@ namespace SuperhotArchipelago.Core
                 }
                 catch (System.Exception ex)
                 {
-                    _log.LogError($"Building a notification for location {locationId} threw -- it may be " +
+                    _log.Error($"Building a notification for location {locationId} threw -- it may be " +
                         $"missing a popup/log entry, but nothing else is affected: {ex}");
                 }
             });

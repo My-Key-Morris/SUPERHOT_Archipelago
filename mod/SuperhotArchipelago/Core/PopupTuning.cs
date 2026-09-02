@@ -95,7 +95,7 @@ namespace SuperhotArchipelago.Core
             }
             catch (Exception ex)
             {
-                Mod.Log?.LogError($"PopupTuning.Load failed, using defaults: {ex}");
+                Mod.Log?.Error($"PopupTuning.Load failed, using defaults: {ex}");
                 Current = new PopupTuning();
             }
         }

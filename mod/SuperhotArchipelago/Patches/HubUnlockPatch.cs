@@ -41,7 +41,7 @@ namespace SuperhotArchipelago.Patches
             }
             catch (System.Exception ex)
             {
-                SuperhotArchipelago.Core.Mod.Log?.LogError($"HubUnlockPatch.Postfix threw: {ex}");
+                SuperhotArchipelago.Core.Mod.Log?.Error($"HubUnlockPatch.Postfix threw: {ex}");
             }
         }
 

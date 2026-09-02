@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using Archipelago.MultiClient.Net.Enums;
-using BepInEx.Logging;
+using MelonLoader;
 
 namespace SuperhotArchipelago.Core
 {
@@ -16,7 +16,7 @@ namespace SuperhotArchipelago.Core
         private static readonly TimeSpan CatchUpWindow = TimeSpan.FromSeconds(5);
 
         private readonly ArchipelagoConnection _connection;
-        private readonly ManualLogSource _log;
+        private readonly MelonLogger.Instance _log;
 
         private readonly struct QueuedItem
         {
@@ -46,7 +46,7 @@ namespace SuperhotArchipelago.Core
 
         private readonly ConcurrentQueue<QueuedItem> _itemQueue = new();
 
-        public ItemManager(ArchipelagoConnection connection, ManualLogSource log)
+        public ItemManager(ArchipelagoConnection connection, MelonLogger.Instance log)
         {
             _connection = connection;
             _log = log;
@@ -78,7 +78,7 @@ namespace SuperhotArchipelago.Core
                     }
                     catch (Exception ex)
                     {
-                        _log.LogError($"ItemReceived handler threw for one item -- it may not unlock its " +
+                        _log.Error($"ItemReceived handler threw for one item -- it may not unlock its " +
                             $"level, but every other item is unaffected: {ex}");
                     }
                 };
@@ -97,14 +97,14 @@ namespace SuperhotArchipelago.Core
                     }
                     catch (Exception ex)
                     {
-                        _log.LogError($"Draining one historical item from the received-items queue threw -- it " +
+                        _log.Error($"Draining one historical item from the received-items queue threw -- it " +
                             $"may not unlock its level, but every other item is unaffected: {ex}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                _log.LogError($"ItemManager.OnConnected failed -- items received this connection " +
+                _log.Error($"ItemManager.OnConnected failed -- items received this connection " +
                     $"may not unlock levels correctly: {ex}");
             }
         }
@@ -136,21 +136,21 @@ namespace SuperhotArchipelago.Core
             {
                 // Filler item (see LevelCatalog.WhiteSpaceItemId) -- gets its own log instead of falling through
                 // to the "unknown item id" warning below.
-                _log.LogInfo("Received 'White Space' -- filler, nothing to apply.");
+                _log.Msg("Received 'White Space' -- filler, nothing to apply.");
                 Notify("White Space", queued.SenderDisplayName, queued.IsCatchUp, queued.LocationId, isSelfSend, queued.Flags);
                 return;
             }
 
             if (!LevelCatalog.ItemIdToLevel.TryGetValue(itemId, out LevelEntry? level))
             {
-                _log.LogWarning($"Received unknown item id {itemId} -- no matching level in LevelCatalog.");
+                _log.Warning($"Received unknown item id {itemId} -- no matching level in LevelCatalog.");
                 return;
             }
 
             // See UnlockState.cs for why this doesn't touch native save data directly; tracked by LevelId,
             // not scene name (see LevelCatalog.LevelEntry for why scene name isn't safe).
             UnlockState.Unlock(level.LevelId);
-            _log.LogInfo($"Unlocked '{level.DisplayName}' (level id {level.LevelId}, scene '{level.SceneName}') from a received item.");
+            _log.Msg($"Unlocked '{level.DisplayName}' (level id {level.LevelId}, scene '{level.SceneName}') from a received item.");
             Notify(level.DisplayName, queued.SenderDisplayName, queued.IsCatchUp, queued.LocationId, isSelfSend, queued.Flags);
 
             // The hub only re-evaluates locks when piOsMenu.LockUnfinishedLevels() runs on its own triggers

@@ -9,8 +9,7 @@ The original SUPERHOT (2016 — not MIND CONTROL DELETE) as a playable game slot
 - Archipelago: [Releases Page](https://github.com/ArchipelagoMW/Archipelago/releases/latest)
 - This apworld: [GitHub Releases Page](https://github.com/My-Key-Morris/SUPERHOT_Archipelago/releases/latest)
 - The mod: [Nexus Mods](https://www.nexusmods.com/superhot/mods/7)
-- [BepInEx](https://github.com/BepInEx/BepInEx) (v5.4.x, the Mono/net472 build) — the mod
-  loader the in-game half runs on
+- [MelonLoader](https://melonwiki.xyz) — the mod loader the in-game half runs on
 
 ## What does randomization do to this game?
 
@@ -87,26 +86,23 @@ The goal is beating the final level, same as vanilla.
 2. Open the Archipelago Launcher, click **Install APWorld**, and pick `superhot.apworld`
    from [this project's GitHub releases](https://github.com/My-Key-Morris/SUPERHOT_Archipelago/releases/latest).
    SUPERHOT should now show up as a supported game.
-3. Install [BepInEx](https://github.com/BepInEx/BepInEx/releases) (the Windows x64, v5.4.x
-   Mono build — not IL2CPP, not the x86 build) into your SUPERHOT install (same folder as
-   `SUPERHOT.exe`). Launch and close SUPERHOT once to finalize the BepInEx install and let
-   it generate its own folders.
-4. Grab the mod from [Nexus Mods](https://www.nexusmods.com/superhot/mods/7) and drop the
-   `SuperhotArchipelago` folder it contains into `BepInEx/plugins/`, alongside
-   `SUPERHOT.exe`'s `BepInEx` folder.
+3. Install [MelonLoader](https://melonwiki.xyz) into your SUPERHOT install (same folder as
+   `SUPERHOT.exe`). Launch and close SUPERHOT once to finalize the MelonLoader install.
+4. Grab the mod from [Nexus Mods](https://www.nexusmods.com/superhot/mods/7) and drop the `Mods` and `UserLibs`
+   folders it contains into your SUPERHOT folder, alongside `SUPERHOT.exe`.
 5. Generate and host a game as usual through the Archipelago Launcher (**Generate**, then
    **Host** on the resulting `.zip`) — or use an already-hosted room if you're joining
    someone else's.
-6. Launch SUPERHOT. BepInEx prints console output on top of the game — look for lines
-   starting with `[Info: SuperhotArchipelago]` confirming it loaded.
+6. Launch SUPERHOT. MelonLoader prints console output on top of the game — look for lines
+   starting with `[SuperhotArchipelago]` confirming it loaded.
 7. On the hub's main screen (alongside `LEVELS`/`ENDLESS`), open the `ARCHIPELAGO` folder
    and select `CONNECT`, then enter your server/slot/password — `Tab`/`Enter` move between
    fields, `Enter` on the last field connects, `Esc` closes the screen. Settings are saved
    automatically, so you won't need to re-enter them next launch.
-8. Play the first level. Watch the BepInEx console for a line confirming a check was
+8. Play the first level. Watch the MelonLoader console for a line confirming a check was
    sent — that's the sign everything's actually wired up correctly.
 
-**If something breaks:** open an issue with whatever the BepInEx console printed
+**If something breaks:** open an issue with whatever the MelonLoader console printed
 (especially red/error lines) and which step you got to.
 
 </details>
@@ -115,7 +111,7 @@ The goal is beating the final level, same as vanilla.
 
 Found a bug, or something feel off? Please open an
 [issue](https://github.com/My-Key-Morris/SUPERHOT_Archipelago/issues) with whatever the
-BepInEx console printed (especially red/error lines) and which step you got to —
+MelonLoader console printed (especially red/error lines) and which step you got to —
 that's the fastest way to track down whether it's a patch not firing, a version mismatch,
 or something more basic.
 
@@ -123,7 +119,7 @@ or something more basic.
 
 ### Tools
 
-- [BepInEx](https://github.com/BepInEx/BepInEx) & [Harmony](https://github.com/pardeike/Harmony) —
+- [MelonLoader](https://melonwiki.xyz) & [Harmony](https://github.com/pardeike/Harmony) —
   the mod's runtime and patching framework
 - [Archipelago.MultiClient.Net](https://github.com/ArchipelagoMW/Archipelago.MultiClient.Net) —
   official C# client library

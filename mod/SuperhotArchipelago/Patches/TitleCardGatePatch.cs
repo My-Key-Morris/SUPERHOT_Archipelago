@@ -33,7 +33,7 @@ namespace SuperhotArchipelago.Patches
             }
 
             inputData.skipButton = SHInput.ButtonState.unpressed;
-            Mod.Log?.LogInfo($"Suppressed SUPERHOT title-card click-through to '{next.SceneFileName}' -- " +
+            Mod.Log?.Msg($"Suppressed SUPERHOT title-card click-through to '{next.SceneFileName}' -- " +
                 $"{blockMessage}. Returning to hub.");
 
             if (SHGUI.current != null)

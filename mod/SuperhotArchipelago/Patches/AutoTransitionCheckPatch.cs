@@ -51,7 +51,7 @@ namespace SuperhotArchipelago.Patches
                 return false;
             }
 
-            Mod.Log?.LogInfo($"Blocked auto-transition to '{next.SceneFileName}' before any " +
+            Mod.Log?.Msg($"Blocked auto-transition to '{next.SceneFileName}' before any " +
                 $"static/camera transition started -- {blockMessage}. Returning to hub.");
 
             if (SHGUI.current != null)

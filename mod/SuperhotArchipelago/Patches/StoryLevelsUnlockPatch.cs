@@ -52,7 +52,7 @@ namespace SuperhotArchipelago.Patches
             }
             catch (System.Exception ex)
             {
-                Mod.Log?.LogError($"StoryLevelsUnlockPatch.Postfix threw: {ex}");
+                Mod.Log?.Error($"StoryLevelsUnlockPatch.Postfix threw: {ex}");
             }
         }
     }
