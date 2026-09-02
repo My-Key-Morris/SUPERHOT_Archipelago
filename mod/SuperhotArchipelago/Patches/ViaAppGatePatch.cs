@@ -20,7 +20,7 @@ namespace SuperhotArchipelago.Patches
             }
 
             Core.PopupOverlay.Show(blockMessage);
-            Core.Mod.Log?.Msg($"Blocked launch of '{level.SceneFileName}' via LaunchLevelViaApp -- {blockMessage}. Returning to hub.");
+            Core.Mod.Log?.LogInfo($"Blocked launch of '{level.SceneFileName}' via LaunchLevelViaApp -- {blockMessage}. Returning to hub.");
 
             if (SHGUI.current != null)
             {

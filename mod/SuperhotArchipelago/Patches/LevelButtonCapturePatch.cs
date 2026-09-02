@@ -46,7 +46,7 @@ namespace SuperhotArchipelago.Patches
             }
             catch (System.Exception ex)
             {
-                Mod.Log?.Error($"LevelButtonCapturePatch.Postfix threw for element.ID=" +
+                Mod.Log?.LogError($"LevelButtonCapturePatch.Postfix threw for element.ID=" +
                     $"{element?.ID.ToString() ?? "(null)"}, customName='{customName}', " +
                     $"b.ButtonText='{b?.ButtonText ?? "(null)"}': {ex}");
             }

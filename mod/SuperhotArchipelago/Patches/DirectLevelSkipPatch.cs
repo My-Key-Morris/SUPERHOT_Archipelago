@@ -22,7 +22,7 @@ namespace SuperhotArchipelago.Patches
             }
 
             Core.PopupOverlay.Show(blockMessage);
-            Core.Mod.Log?.Msg($"Blocked direct-continue to '{next.SceneFileName}' -- " +
+            Core.Mod.Log?.LogInfo($"Blocked direct-continue to '{next.SceneFileName}' -- " +
                 $"{blockMessage}. Returning to hub instead of leaving the player stuck.");
 
             if (SHGUI.current != null)

@@ -1,4 +1,4 @@
-using MelonLoader;
+using BepInEx.Configuration;
 using SuperhotArchipelago.Core;
 
 namespace SuperhotArchipelago.Patches
@@ -62,7 +62,7 @@ namespace SuperhotArchipelago.Patches
         /// wiring needed (unlike CONNECT/AP MODE) since nothing but this button's own click
         /// ever changes these values.
         /// </summary>
-        private static void AddToggle(SHGUIcommanderview view, string label, MelonPreferences_Entry<bool> pref, string description)
+        private static void AddToggle(SHGUIcommanderview view, string label, ConfigEntry<bool> pref, string description)
         {
             SHGUIcommanderbutton button = null!;
             button = new SHGUIcommanderbutton(BuildLabel(label, pref.Value), 'w', delegate

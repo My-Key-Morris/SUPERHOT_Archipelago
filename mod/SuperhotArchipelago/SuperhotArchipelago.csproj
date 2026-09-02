@@ -3,10 +3,8 @@
   <PropertyGroup>
     <!--
       CONFIRMED (checked the real install): SH_Data/Managed/Assembly-CSharp.dll exists,
-      so this is a Mono build, not IL2CPP. MelonLoader's net472 runtime is the right one
-      (there's also a net6 folder in MelonLoader for IL2CPP games; not what we want
-      here). app.info confirms MelonGame identifiers too: "SUPERHOT_Team" / "SUPERHOT",
-      already set correctly in Core/Mod.cs.
+      so this is a Mono build, not IL2CPP. BepInEx's net472 build is the right one for
+      this game (there's also an IL2CPP variant of BepInEx; not what we want here).
     -->
     <TargetFramework>net472</TargetFramework>
     <AssemblyName>SuperhotArchipelago</AssemblyName>
@@ -16,7 +14,7 @@
 
   <!--
     SuperhotGameDir must point at a real SUPERHOT install (the folder containing SH_Data/
-    and MelonLoader/). Deliberately not hardcoded here: every dev's install lives
+    and BepInEx/). Deliberately not hardcoded here: every dev's install lives
     somewhere different, and an earlier version of this file hardcoded one specific
     machine's path, which both leaked a local username into source control and silently
     broke the build for anyone else. Set it one of three ways:
@@ -41,15 +39,20 @@
   <ItemGroup>
     <!-- Official Archipelago C# client; opens its own WebSocket, no external process needed. -->
     <PackageReference Include="Archipelago.MultiClient.Net" Version="6.*" />
+    <!-- BepInEx/core does NOT bundle Newtonsoft.Json the way MelonLoader did, so this
+         project needs its own copy. Private defaults to true (no override needed here),
+         so it's copied to the plugin's own output folder and ships alongside the built
+         DLL in BepInEx/plugins/SuperhotArchipelago/. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.*" />
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="MelonLoader">
-      <HintPath>$(SuperhotGameDir)\MelonLoader\net472\MelonLoader.dll</HintPath>
+    <Reference Include="BepInEx">
+      <HintPath>$(SuperhotGameDir)\BepInEx\core\BepInEx.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="0Harmony">
-      <HintPath>$(SuperhotGameDir)\MelonLoader\net472\0Harmony.dll</HintPath>
+      <HintPath>$(SuperhotGameDir)\BepInEx\core\0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Assembly-CSharp">
@@ -95,13 +98,6 @@
          this module's real types via ilspycmd against the actual shipped DLL. -->
     <Reference Include="UnityEngine.InputLegacyModule">
       <HintPath>$(SuperhotGameDir)\SH_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <!-- Used by Core/LevelCatalog.cs to parse data/levels.json. MelonLoader already
-         ships this DLL (mods load in the same process/AppDomain as MelonLoader itself),
-         so we reference its copy rather than pulling in a second one via NuGet. -->
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>$(SuperhotGameDir)\MelonLoader\net472\Newtonsoft.Json.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

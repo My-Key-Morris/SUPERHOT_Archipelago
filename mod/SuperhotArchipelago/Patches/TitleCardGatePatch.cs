@@ -30,7 +30,7 @@ namespace SuperhotArchipelago.Patches
 
             inputData.skipButton = SHInput.ButtonState.unpressed;
             PopupOverlay.Show(blockMessage);
-            Mod.Log?.Msg($"Suppressed SUPERHOT title-card click-through to '{next.SceneFileName}' -- {blockMessage}.");
+            Mod.Log?.LogInfo($"Suppressed SUPERHOT title-card click-through to '{next.SceneFileName}' -- {blockMessage}.");
         }
     }
 

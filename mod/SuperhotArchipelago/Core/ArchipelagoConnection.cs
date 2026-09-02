@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Enums;
-using MelonLoader;
+using BepInEx.Logging;
 using Newtonsoft.Json.Linq;
 
 namespace SuperhotArchipelago.Core
@@ -13,7 +13,7 @@ namespace SuperhotArchipelago.Core
     /// </summary>
     public class ArchipelagoConnection
     {
-        private readonly MelonLogger.Instance _log;
+        private readonly ManualLogSource _log;
         public ArchipelagoSession? Session { get; private set; }
         public bool IsConnected { get; private set; }
 
@@ -38,7 +38,7 @@ namespace SuperhotArchipelago.Core
 
         public event Action? Connected;
 
-        public ArchipelagoConnection(MelonLogger.Instance log)
+        public ArchipelagoConnection(ManualLogSource log)
         {
             _log = log;
         }
@@ -51,7 +51,7 @@ namespace SuperhotArchipelago.Core
             if (string.IsNullOrEmpty(server) || string.IsNullOrEmpty(slotName))
             {
                 LastError = "Server and Slot are both required.";
-                _log.Warning($"Not connecting: {LastError}");
+                _log.LogWarning($"Not connecting: {LastError}");
                 return;
             }
 
@@ -74,7 +74,7 @@ namespace SuperhotArchipelago.Core
                 if (!result.Successful)
                 {
                     LastError = "Login failed -- check server address, slot name, and password.";
-                    _log.Error($"Failed to connect to Archipelago server: {server}");
+                    _log.LogError($"Failed to connect to Archipelago server: {server}");
                     return;
                 }
 
@@ -86,11 +86,11 @@ namespace SuperhotArchipelago.Core
                     // Comes back as a boxed numeric type via Newtonsoft.Json -- Convert.ToInt32 handles that
                     // instead of risking an InvalidCastException on a direct (int) cast.
                     LevelsRequiredForFree = Convert.ToInt32(rawRequired);
-                    _log.Msg($"Slot data: {LevelsRequiredForFree} other levels required to enter '34 - Free'.");
+                    _log.LogInfo($"Slot data: {LevelsRequiredForFree} other levels required to enter '34 - Free'.");
                 }
                 else
                 {
-                    _log.Warning("Slot data had no 'levels_required_for_free' -- falling back to " +
+                    _log.LogWarning("Slot data had no 'levels_required_for_free' -- falling back to " +
                         $"{LevelsRequiredForFree}. Expected if this room was generated from an " +
                         "apworld version older than this feature.");
                 }
@@ -104,7 +104,7 @@ namespace SuperhotArchipelago.Core
                     ExcludedLevelOrders = new HashSet<int>(excludedArray.ToObject<List<int>>() ?? new List<int>());
                     if (ExcludedLevelOrders.Count > 0)
                     {
-                        _log.Msg($"Slot data: {ExcludedLevelOrders.Count} level(s) excluded from " +
+                        _log.LogInfo($"Slot data: {ExcludedLevelOrders.Count} level(s) excluded from " +
                             "tracking (ExcludeSlowLevels) -- always unlocked, no checks sent for them.");
                     }
                 }
@@ -116,7 +116,7 @@ namespace SuperhotArchipelago.Core
             catch (Exception ex)
             {
                 LastError = ex.Message;
-                _log.Error($"Failed to connect to Archipelago server '{server}': {ex.Message}");
+                _log.LogError($"Failed to connect to Archipelago server '{server}': {ex.Message}");
                 return;
             }
 
@@ -132,7 +132,7 @@ namespace SuperhotArchipelago.Core
             // the new room's own history.
             UnlockState.Clear();
 
-            _log.Msg($"Connected to Archipelago as '{slotName}'.");
+            _log.LogInfo($"Connected to Archipelago as '{slotName}'.");
 
             // .NET's multicast delegate invocation is NOT fault-isolated -- if one subscriber throws, every
             // subscriber after it in the list is simply never invoked. Invoking each subscriber individually
@@ -148,7 +148,7 @@ namespace SuperhotArchipelago.Core
                     }
                     catch (Exception ex)
                     {
-                        _log.Error($"A Connected event handler threw and was skipped: {ex}");
+                        _log.LogError($"A Connected event handler threw and was skipped: {ex}");
                     }
                 }
             }
@@ -177,12 +177,12 @@ namespace SuperhotArchipelago.Core
             }
             catch (Exception ex)
             {
-                _log.Warning($"Error while disconnecting from the Archipelago server: {ex.Message}");
+                _log.LogWarning($"Error while disconnecting from the Archipelago server: {ex.Message}");
             }
 
             Session = null;
             IsConnected = false;
-            _log.Msg("Disconnected from the Archipelago server.");
+            _log.LogInfo("Disconnected from the Archipelago server.");
         }
     }
 }
