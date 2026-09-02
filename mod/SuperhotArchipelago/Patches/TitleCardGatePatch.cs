@@ -9,7 +9,11 @@ namespace SuperhotArchipelago.Patches
     /// synchronously on skip-button press, then defers the actual level launch (already
     /// gated by ViaAppGatePatch) too late to block cleanly. Instead of unwinding those
     /// effects after the fact, this suppresses the skip-button input itself before the
-    /// native method reads it, so nothing starts in the first place when blocked.
+    /// native method reads it, so nothing starts in the first place when blocked -- then,
+    /// same as every other gate (ViaAppGatePatch/DirectLevelSkipPatch/AutoTransitionCheckPatch),
+    /// redirects to the hub instead of just eating the click, so a blocked click still goes
+    /// somewhere rather than leaving the player stuck staring at a frozen title card with no
+    /// feedback (real, explicit user request -- this was the one gate that didn't already do this).
     /// </summary>
     internal static class TitleCardGate
     {
@@ -29,8 +33,13 @@ namespace SuperhotArchipelago.Patches
             }
 
             inputData.skipButton = SHInput.ButtonState.unpressed;
-            PopupOverlay.Show(blockMessage);
-            Mod.Log?.LogInfo($"Suppressed SUPERHOT title-card click-through to '{next.SceneFileName}' -- {blockMessage}.");
+            Mod.Log?.LogInfo($"Suppressed SUPERHOT title-card click-through to '{next.SceneFileName}' -- " +
+                $"{blockMessage}. Returning to hub.");
+
+            if (SHGUI.current != null)
+            {
+                SHGUI.current.LaunchLevelAppTunnels("SHMenu", false);
+            }
         }
     }
 

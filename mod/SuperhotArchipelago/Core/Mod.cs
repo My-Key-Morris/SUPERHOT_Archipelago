@@ -297,7 +297,6 @@ namespace SuperhotArchipelago.Core
             LevelInfo current = LevelSetup.CurrentLevelInfo;
             if (sceneName != "SHMenu" && current != null && LevelAccessGuard.ShouldBlock(current, out string blockMessage))
             {
-                PopupOverlay.Show(blockMessage);
                 Logger.LogInfo($"Safety net: scene '{sceneName}' resolved to a locked level " +
                     "that no launch-time gate caught -- kicking back to hub.");
 

@@ -51,7 +51,6 @@ namespace SuperhotArchipelago.Patches
                 return false;
             }
 
-            PopupOverlay.Show(blockMessage);
             Mod.Log?.LogInfo($"Blocked auto-transition to '{next.SceneFileName}' before any " +
                 $"static/camera transition started -- {blockMessage}. Returning to hub.");
 

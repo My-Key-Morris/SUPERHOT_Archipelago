@@ -18,7 +18,6 @@ namespace SuperhotArchipelago.Patches
                 return true;
             }
 
-            Core.PopupOverlay.Show(blockMessage);
             Core.Mod.Log?.LogInfo($"Blocked launch of '{level.SceneFileName}' via LaunchLevelAppTunnels -- {blockMessage}");
 
             return false;
