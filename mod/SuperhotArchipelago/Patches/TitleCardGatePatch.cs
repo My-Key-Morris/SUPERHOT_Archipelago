@@ -29,7 +29,7 @@ namespace SuperhotArchipelago.Patches
             }
 
             inputData.skipButton = SHInput.ButtonState.unpressed;
-            TextManager.AddUptitleToQueue(new LocalizableText(blockMessage));
+            PopupOverlay.Show(blockMessage);
             Mod.Log?.Msg($"Suppressed SUPERHOT title-card click-through to '{next.SceneFileName}' -- {blockMessage}.");
         }
     }

@@ -68,6 +68,27 @@
       <HintPath>$(SuperhotGameDir)\SH_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- Core/PopupOverlay.cs builds a standalone uGUI Canvas+Text overlay, bypassing
+         SHGUI's shader-based ASCII terminal renderer entirely (see that file's own
+         comment for why: SHGUI's AsciiText draws via a custom OnRenderImage blit whose
+         blend mode appears to be additive, confirmed by black text/backdrop being
+         completely invisible in "Round 48" live tests). A real Canvas in
+         ScreenSpaceOverlay mode composites with standard alpha blending instead, drawn
+         in its own pass after all camera rendering, so it can't be washed out the same
+         way. Confirmed present in the shipped Managed folder via ilspycmd before adding
+         these references. -->
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(SuperhotGameDir)\SH_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(SuperhotGameDir)\SH_Data\Managed\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(SuperhotGameDir)\SH_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <!-- Input/KeyCode (Core/ArchipelagoConnectApp.cs's free-text field entry, using the
          same Input.inputString/GetKeyDown pattern the game's own native dev console,
          AppSHConsole, uses) live here, not UnityEngine.CoreModule; confirmed by listing

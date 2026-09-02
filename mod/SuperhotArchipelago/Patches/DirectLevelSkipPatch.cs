@@ -21,7 +21,7 @@ namespace SuperhotArchipelago.Patches
                 return true;
             }
 
-            TextManager.AddUptitleToQueue(new LocalizableText(blockMessage));
+            Core.PopupOverlay.Show(blockMessage);
             Core.Mod.Log?.Msg($"Blocked direct-continue to '{next.SceneFileName}' -- " +
                 $"{blockMessage}. Returning to hub instead of leaving the player stuck.");
 

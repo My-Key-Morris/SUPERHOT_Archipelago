@@ -51,7 +51,7 @@ namespace SuperhotArchipelago.Patches
                 return false;
             }
 
-            TextManager.AddUptitleToQueue(new LocalizableText(blockMessage));
+            PopupOverlay.Show(blockMessage);
             Mod.Log?.Msg($"Blocked auto-transition to '{next.SceneFileName}' before any " +
                 $"static/camera transition started -- {blockMessage}. Returning to hub.");
 

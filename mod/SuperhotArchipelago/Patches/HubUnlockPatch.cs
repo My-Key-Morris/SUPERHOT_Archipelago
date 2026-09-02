@@ -29,6 +29,24 @@ namespace SuperhotArchipelago.Patches
 
         public static void Postfix()
         {
+            // This Postfix on piOsMenu.LockUnfinishedLevels() never had a try/catch before an
+            // uncaught exception here would propagate into whatever native code called
+            // LockUnfinishedLevels(), silently aborting a larger hub-construction sequence with
+            // nothing useful in the log. Added during "Round 48"'s cold-boot freeze
+            // investigation (the actual bug turned out to be elsewhere -- see
+            // PopupOverlay.EnsureView's comment) but the risk is real regardless.
+            try
+            {
+                RunPostfixBody();
+            }
+            catch (System.Exception ex)
+            {
+                SuperhotArchipelago.Core.Mod.Log?.Error($"HubUnlockPatch.Postfix threw: {ex}");
+            }
+        }
+
+        private static void RunPostfixBody()
+        {
             // Archipelago mode can be disabled entirely to play vanilla; skipping this pass
             // then leaves the native lock/scramble result untouched. Note that
             // LockUnfinishedLevels() itself can also go uncalled by native code entirely

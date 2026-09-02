@@ -18,28 +18,42 @@ namespace SuperhotArchipelago.Patches
     {
         public static void Postfix(piOsMenu __instance, XElement e)
         {
-            // While Archipelago mode is off, HubUnlockPatch's Postfix already no-ops, so
-            // forcing a native LockUnfinishedLevels() call here would just be wasted work.
-            if (!Mod.IsEnabled)
+            // This Postfix on piOsMenu.CreateViewFromNode -- plausibly involved in building the
+            // hub menu tree from its XML config -- calls the NATIVE LockUnfinishedLevels()
+            // synchronously below. If that call (or HubUnlockPatch's own Postfix on it) throws,
+            // the exception would propagate straight back into whatever native code is building
+            // the rest of the menu tree, with nothing useful in the log. Added during "Round
+            // 48"'s cold-boot freeze investigation (the actual bug turned out to be elsewhere --
+            // see PopupOverlay.EnsureView's comment) but the risk is real regardless.
+            try
             {
-                return;
-            }
+                // While Archipelago mode is off, HubUnlockPatch's Postfix already no-ops, so
+                // forcing a native LockUnfinishedLevels() call here would just be wasted work.
+                if (!Mod.IsEnabled)
+                {
+                    return;
+                }
 
-            if (e == null)
+                if (e == null)
+                {
+                    return;
+                }
+
+                bool builtStoryLevelsFolder = e.Elements()
+                    .Any(child => child.Name.ToString() == "item"
+                        && child.Attribute("type")?.Value == "storylevels");
+
+                if (!builtStoryLevelsFolder)
+                {
+                    return;
+                }
+
+                __instance.LockUnfinishedLevels();
+            }
+            catch (System.Exception ex)
             {
-                return;
+                Mod.Log?.Error($"StoryLevelsUnlockPatch.Postfix threw: {ex}");
             }
-
-            bool builtStoryLevelsFolder = e.Elements()
-                .Any(child => child.Name.ToString() == "item"
-                    && child.Attribute("type")?.Value == "storylevels");
-
-            if (!builtStoryLevelsFolder)
-            {
-                return;
-            }
-
-            __instance.LockUnfinishedLevels();
         }
     }
 }

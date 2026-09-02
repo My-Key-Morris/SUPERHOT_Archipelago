@@ -1,3 +1,4 @@
+using System;
 using MelonLoader;
 
 // Matches the strings in SH_Data/app.info exactly.
@@ -169,26 +170,43 @@ namespace SuperhotArchipelago.Core
 
         public override void OnUpdate()
         {
-            // Network item receives happen off Unity's main thread; this drains the queue
-            // once per frame where it's safe to touch game state.
-            Items?.ProcessQueue();
+            // Each call wrapped individually rather than one try/catch around the whole method,
+            // so a step that throws is identified by name in the log instead of just "somewhere
+            // in OnUpdate" -- added after "Round 48"'s cold-boot freeze investigation showed how
+            // easily a silent failure here (or in a Postfix a step calls into) can be mistaken
+            // for a hang with zero diagnostic trail.
+            RunStep("Items.ProcessQueue", () => Items?.ProcessQueue());
+            RunStep("Locations.ProcessPendingNotifications", () => Locations?.ProcessPendingNotifications());
+            RunStep("NotificationLog.FlushPendingPopups", NotificationLog.FlushPendingPopups);
+            RunStep("PopupOverlay.Update", PopupOverlay.Update);
+            RunStep("PopupOverlay.DebugHotkey", CheckPopupDebugHotkey);
+            RunStep("ConnectionButtonPatch.RefreshLabel", Patches.ConnectionButtonPatch.RefreshLabel);
+            RunStep("ArchipelagoModeTogglePatch.RefreshLabel", Patches.ArchipelagoModeTogglePatch.RefreshLabel);
+        }
 
-            // Scout results also resolve off the main thread; this turns them into real
-            // NotificationLog entries on the main thread.
-            Locations?.ProcessPendingNotifications();
+        // Debug aid for live-tuning PopupOverlay's look (see PopupTuning.cs's own doc comment
+        // for why this exists): F9 tears down the current Canvas, reloads PopupTuning.json from
+        // disk, and shows a sample string covering mixed case/digits/punctuation, so edits to
+        // that file can be eyeballed in-game without a rebuild + redeploy + restart per change.
+        private static void CheckPopupDebugHotkey()
+        {
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.F9))
+            {
+                PopupOverlay.ReloadTuning();
+                PopupOverlay.Show("LOCKED: 'Sample Level 42' needs an Archipelago item to unlock");
+            }
+        }
 
-            // See NotificationLog's _pendingPopups comment for why popups are queued instead
-            // of dispatched immediately; this flushes them once it's safe.
-            NotificationLog.FlushPendingPopups();
-
-            // The ARCHIPELAGO button's label is only computed once when the hub view is built,
-            // so it can drift out of sync with the real connection state; refreshing every
-            // frame fixes that (cheap no-op if the button isn't on screen).
-            Patches.ConnectionButtonPatch.RefreshLabel();
-
-            // Same reasoning for the AP MODE toggle button, since its state can also change
-            // from outside its own click handler (a direct config file edit).
-            Patches.ArchipelagoModeTogglePatch.RefreshLabel();
+        private void RunStep(string name, Action step)
+        {
+            try
+            {
+                step();
+            }
+            catch (Exception ex)
+            {
+                LoggerInstance.Error($"[debug] OnUpdate step '{name}' threw: {ex}");
+            }
         }
 
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
@@ -197,6 +215,23 @@ namespace SuperhotArchipelago.Core
             // a real playthrough's actual scene order.
             LoggerInstance.Msg($"Scene loaded: {sceneName} (buildIndex {buildIndex})");
 
+            // Wrapped in try/catch so one bad section (or an exception from a Postfix a section
+            // calls into, e.g. HubUnlockPatch) can't silently abort the rest of scene-load
+            // handling -- added after "Round 48"'s cold-boot freeze investigation, which spent
+            // a long time ruling out exactly this kind of silent failure before finding the
+            // real cause (see PopupOverlay.EnsureView's comment).
+            try
+            {
+                RunSceneWasLoadedBody(sceneName);
+            }
+            catch (Exception ex)
+            {
+                LoggerInstance.Error($"OnSceneWasLoaded('{sceneName}') threw: {ex}");
+            }
+        }
+
+        private void RunSceneWasLoadedBody(string sceneName)
+        {
             // storyFinished is left alone to behave exactly like vanilla -- do not force it
             // false to keep HubUnlockPatch running, since that also breaks the native MODS
             // folder's own unlock check. See Patches/StoryLevelsUnlockPatch.cs for the real fix.
@@ -225,10 +260,24 @@ namespace SuperhotArchipelago.Core
             // Hacker"'s native ending forcing a restart into "25 - Fall"): if the scene that
             // just loaded resolves to one of our tracked, still-locked levels, kick back to
             // the hub. May flash the wrong level briefly, but guarantees nothing locked stays playable.
+            //
+            // Real bug found live (first-ever cold-boot test of PopupOverlay): LevelSetup
+            // .CurrentLevelInfo, when the scene that just loaded IS "SHMenu" itself, resolves
+            // forward (via LevelAccessGuard's ResolveToTrackedLevel) to the catalog's first
+            // real level, which isn't the raw scene asked about -- so ShouldBlock's untracked-
+            // passthrough branch fires unconditionally ("Return to hub to continue") every time
+            // the hub loads. LaunchLevelAppTunnels("SHMenu", ...) then tries to tunnel from the
+            // hub to itself, which never completes -- confirmed via a stuck black screen (the
+            // native tunnel-transition effect frozen mid-warp) on every single boot, logged as
+            // "Safety net: scene 'SHMenu' resolved to a locked level" going back to Aug 9. This
+            // was previously misjudged as a harmless quirk (ruled out only as a cause of the
+            // "Round 45" click regression, never actually confirmed benign on its own). Skipping
+            // the whole net for "SHMenu" is correct: this check exists to catch a real LEVEL
+            // scene slipping through locked, and the hub is never itself a locked level.
             LevelInfo current = LevelSetup.CurrentLevelInfo;
-            if (current != null && LevelAccessGuard.ShouldBlock(current, out string blockMessage))
+            if (sceneName != "SHMenu" && current != null && LevelAccessGuard.ShouldBlock(current, out string blockMessage))
             {
-                TextManager.AddUptitleToQueue(new LocalizableText(blockMessage));
+                PopupOverlay.Show(blockMessage);
                 LoggerInstance.Msg($"Safety net: scene '{sceneName}' resolved to a locked level " +
                     "that no launch-time gate caught -- kicking back to hub.");
 
@@ -237,6 +286,10 @@ namespace SuperhotArchipelago.Core
                     SHGUI.current.LaunchLevelAppTunnels("SHMenu", false);
                 }
             }
+
+            // TextManager recreates its own text views on every scene load (see
+            // PopupOverlay.OnSceneLoaded's doc comment for why this class matches that).
+            PopupOverlay.OnSceneLoaded();
         }
     }
 }

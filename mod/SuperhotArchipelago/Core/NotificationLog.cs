@@ -40,14 +40,10 @@ namespace SuperhotArchipelago.Core
         // location id for historical entries, long.MaxValue for live ones) so they sort correctly.
         private static readonly List<long> _entryOrderKeys = new();
 
-        // TextManager's native uptitle queue gives each entry only ~1 real-time second, which can tick by
-        // unseen during a secret's content-app freeze or a level-completion scene transition. Popups are
-        // queued here instead and only dispatched by FlushPendingPopups() once forcedTimeScale is unfrozen.
+        // A popup queued the instant something happens can tick by unseen during a secret's
+        // content-app freeze or a level-completion scene transition. Popups are queued here
+        // instead and only dispatched by FlushPendingPopups() once forcedTimeScale is unfrozen.
         private static readonly List<string> _pendingPopups = new();
-
-        // Repeats each popup this many times since the ~1-second display isn't otherwise configurable
-        // without patching TextManager's timer field.
-        private const int PopupRepeatCount = 3;
 
         // Caps pending popups so a burst of checks/receives can't queue so many that later popups fall
         // far behind real time -- a dropped popup is still preserved in the log, just not shown.
@@ -100,7 +96,7 @@ namespace SuperhotArchipelago.Core
         }
 
         /// <summary>
-        /// Dispatches popups queued by Add() to the native uptitle system once it's safe to (see
+        /// Dispatches popups queued by Add() to PopupOverlay once it's safe to (see
         /// _pendingPopups). Called every frame from Mod.OnUpdate(); a no-op when nothing is pending.
         /// </summary>
         public static void FlushPendingPopups()
@@ -112,10 +108,7 @@ namespace SuperhotArchipelago.Core
 
             foreach (string popupText in _pendingPopups)
             {
-                for (int i = 0; i < PopupRepeatCount; i++)
-                {
-                    TextManager.AddUptitleToQueue(new LocalizableText(popupText));
-                }
+                PopupOverlay.Show(popupText);
             }
             _pendingPopups.Clear();
         }

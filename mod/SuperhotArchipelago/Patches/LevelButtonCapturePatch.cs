@@ -14,26 +14,42 @@ namespace SuperhotArchipelago.Patches
     {
         public static void Postfix(ref SHGUIcommanderbutton b, LevelInfo element, string customName)
         {
-            if (customName != "" || b == null || element == null)
+            // This Postfix runs once per hub button DURING the native hub-build loop
+            // (PrepareLevelCommanderButtonForLevel is called per-button while the hub commander
+            // view constructs its button list) -- an uncaught exception here would propagate
+            // into that native loop and silently abort hub construction partway, with nothing
+            // useful in the log. "Round 48"'s cold-boot freeze investigation went looking for
+            // exactly this kind of failure (it turned out to be a different bug, see
+            // PopupOverlay.EnsureView's comment) but the risk is real regardless, so this stays.
+            try
             {
-                return;
-            }
+                if (customName != "" || b == null || element == null)
+                {
+                    return;
+                }
 
-            if (!LevelCatalog.LevelIdToLevel.ContainsKey(element.ID))
+                if (!LevelCatalog.LevelIdToLevel.ContainsKey(element.ID))
+                {
+                    // Not a tracked story level (e.g. endless-mode entries use a separate ID range).
+                    return;
+                }
+
+                // Cache just the name portion; the status suffix is rebuilt fresh by
+                // HubUnlockPatch since the unlock decision can change after this point.
+                int separatorIndex = b.ButtonText.IndexOf('│');
+                string cleanName = separatorIndex >= 0 ? b.ButtonText.Substring(0, separatorIndex) : b.ButtonText;
+                ButtonTextCache.Remember(element.ID, cleanName);
+
+                // Also cache the right-panel description text before anything else can touch it,
+                // so HubUnlockPatch has a known-clean original to rebuild from.
+                ButtonTextCache.RememberData(element.ID, b.data);
+            }
+            catch (System.Exception ex)
             {
-                // Not a tracked story level (e.g. endless-mode entries use a separate ID range).
-                return;
+                Mod.Log?.Error($"LevelButtonCapturePatch.Postfix threw for element.ID=" +
+                    $"{element?.ID.ToString() ?? "(null)"}, customName='{customName}', " +
+                    $"b.ButtonText='{b?.ButtonText ?? "(null)"}': {ex}");
             }
-
-            // Cache just the name portion; the status suffix is rebuilt fresh by
-            // HubUnlockPatch since the unlock decision can change after this point.
-            int separatorIndex = b.ButtonText.IndexOf('│');
-            string cleanName = separatorIndex >= 0 ? b.ButtonText.Substring(0, separatorIndex) : b.ButtonText;
-            ButtonTextCache.Remember(element.ID, cleanName);
-
-            // Also cache the right-panel description text before anything else can touch it,
-            // so HubUnlockPatch has a known-clean original to rebuild from.
-            ButtonTextCache.RememberData(element.ID, b.data);
         }
     }
 }

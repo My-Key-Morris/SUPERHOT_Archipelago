@@ -18,7 +18,7 @@ namespace SuperhotArchipelago.Patches
                 return true;
             }
 
-            TextManager.AddUptitleToQueue(new LocalizableText(blockMessage));
+            Core.PopupOverlay.Show(blockMessage);
             Core.Mod.Log?.Msg($"Blocked launch of '{level.SceneFileName}' via LaunchLevelAppTunnels -- {blockMessage}");
 
             return false;

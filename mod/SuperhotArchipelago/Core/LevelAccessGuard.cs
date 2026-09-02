@@ -65,9 +65,11 @@ namespace SuperhotArchipelago.Core
 
             if (!UnlockState.IsUnlocked(tracked.ID))
             {
-                // Kept short and under vanilla's own uptitle lengths -- the uptitle is a
-                // fixed-width UI element that truncates on both edges rather than wrapping.
-                blockMessage = $"LOCKED: '{entry.DisplayName}' needs an AP item";
+                // No longer needs to be kept artificially short -- that was working around
+                // the old uptitle's fixed-width truncation (and, briefly, SHGUI's own
+                // shader-based text renderer). PopupOverlay's Canvas-based box wraps/sizes to
+                // fit real text, so this can just say what it means.
+                blockMessage = $"LOCKED: '{entry.DisplayName}' needs an Archipelago item to unlock";
                 return true;
             }
 
