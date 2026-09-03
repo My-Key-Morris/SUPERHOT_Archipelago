@@ -35,7 +35,7 @@ class SuperhotWeb(WebWorld):
             "English",
             "setup_en.md",
             "setup/en",
-            ["Michael"],
+            ["My-Key-Morris"],
         )
     ]
 

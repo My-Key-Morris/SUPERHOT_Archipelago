@@ -6,7 +6,7 @@
 # See https://archipelago.gg/tutorial/Archipelago/setup/en for the general format if you
 # want to add more players to the same YAML file, or check other games' options.
 
-name: Michael
+name: Player1
 description: Sample player file for the SUPERHOT Archipelago world -- see TESTING.md.
 game: SUPERHOT
 

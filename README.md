@@ -36,7 +36,7 @@ The goal is beating the final level, same as vanilla.
   secret) from both pools entirely — they're known for slower, more repetitive gameplay
   than the rest of the campaign. An excluded level stays freely playable in-game, always
   unlocked, exactly like `01 - Kick`; it just isn't part of the multiworld item/location
-  pool. See `dist/superhot_michael.yaml` for where to set it.
+  pool. See `dist/superhot_example.yaml` for where to set it.
 
 </details>
 
@@ -71,7 +71,7 @@ The goal is beating the final level, same as vanilla.
   right-side preview panel when you scroll to it, the same way a cracked/not-cracked
   secret shows up for other levels. How many levels are required is a YAML option,
   `levels_required_for_free` (0–31, default 25, 0 disables it) — see
-  `dist/superhot_michael.yaml` for where to set it.
+  `dist/superhot_example.yaml` for where to set it.
 
 </details>
 
