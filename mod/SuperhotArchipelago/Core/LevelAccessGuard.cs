@@ -28,7 +28,7 @@ namespace SuperhotArchipelago.Core
                 return false;
             }
 
-            LevelInfo tracked = ResolveToTrackedLevel(level);
+            LevelInfo? tracked = ResolveToTrackedLevel(level);
             if (tracked == null)
             {
                 return false;
@@ -98,9 +98,9 @@ namespace SuperhotArchipelago.Core
         /// Walks forward through LevelSetup.Levels (the raw, unfiltered list), skipping
         /// entries not in our catalog, until it finds the next tracked level or gives up.
         /// </summary>
-        private static LevelInfo ResolveToTrackedLevel(LevelInfo level)
+        private static LevelInfo? ResolveToTrackedLevel(LevelInfo level)
         {
-            LevelInfo current = level;
+            LevelInfo? current = level;
             int steps = 0;
 
             while (current != null && !string.IsNullOrEmpty(current.SceneFileName)

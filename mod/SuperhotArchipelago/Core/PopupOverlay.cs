@@ -8,63 +8,27 @@ using UnityEngine.UI;
 namespace SuperhotArchipelago.Core
 {
     /// <summary>
-    /// Replaces TextManager.AddUptitleToQueue as the display mechanism for every popup this
-    /// mod shows (check notifications and LOCKED-style block messages) -- five rounds of
-    /// patching TextManager's native uptitle (NOTES.md's Rounds 42-47) never got legibility
-    /// reliably above "weak" on the game's many pure-white scenes, and a follow-up rewrite
-    /// onto a real SHGUItext (Round 48) got the freeze-safe insertion right but hit a wall on
-    /// legibility that turned out to be architectural, not a color choice: SHGUI's own text
-    /// renders via AsciiText's OnRenderImage, a fullscreen shader blit (decompile-confirmed --
-    /// see AsciiText.cs's MaterialInit/OnRenderImage) rather than standard UI compositing. A
-    /// live test setting text to black (SetColor('0')) rendered as literally nothing, and a
-    /// black backdrop (SetBackColor('0')) was equally invisible despite the underlying color
-    /// data being confirmed opaque black at the sColors level -- both symptoms line up with
-    /// that shader compositing additively (adding black contributes zero brightness, so it can
-    /// never show against anything), which also explains why white text over that same shader
-    /// only ever worked against scenes that weren't already fully blown-out/white (additively
-    /// blending onto an already-saturated pixel clamps right back to the same saturated pixel,
-    /// regardless of what color is added).
+    /// Display mechanism for every popup this mod shows (check notifications and LOCKED-style
+    /// block messages). Draws through a real Unity uGUI Canvas (RenderMode.ScreenSpaceOverlay)
+    /// rather than SHGUI's own terminal-text renderer, because SHGUI's text composites via an
+    /// additive fullscreen shader blit (AsciiText's OnRenderImage) that washes out or vanishes
+    /// entirely against the game's many pure-white/blown-out scenes -- a uGUI Canvas renders in
+    /// its own pass after all camera/image-effect shaders with standard alpha blending, so it
+    /// can't be cancelled the same way, and as a fully separate GameObject tree (DontDestroyOnLoad,
+    /// never touching SHGUI.current.views) it also can't be starved by SHGUI's own view-queue
+    /// timing.
     ///
-    /// This class sidesteps that whole shader entirely by drawing through a real Unity uGUI
-    /// Canvas (RenderMode.ScreenSpaceOverlay) instead of SHGUI's terminal grid. A uGUI Canvas
-    /// renders in its own pass *after* all camera rendering (including any image-effect
-    /// shaders), using standard alpha blending, so it can't be washed out or cancelled the way
-    /// SHGUI's own text was -- confirmed via ilspycmd that UnityEngine.UI.dll/UIModule.dll/
-    /// TextRenderingModule.dll (Canvas, CanvasScaler, Text, Font) all ship in this game's
-    /// Managed folder before committing to this approach. This also sidesteps "Round 48"'s
-    /// entire SHGUI.Update()/PopViewFromQueue() starvation class of bug by construction: this
-    /// Canvas is a totally separate GameObject tree, never touches SHGUI.current.views, and is
-    /// marked DontDestroyOnLoad so it doesn't need to be recreated (or gated on scene setup
-    /// completing) on every scene load the way the SHGUItext-based version did.
+    /// Renders text using the game's actual terminal font rather than an OS-font approximation:
+    /// AsciiText.FontInit loads a public SHGUIFontAsset ScriptableObject from
+    /// Resources.Load("Fonts/SHGUIFontAsset_EU"), whose FontDescription is an AngelCode-BMFont-
+    /// style glyph XML. BuildGameFont() below parses that same XML into a real UnityEngine.Font's
+    /// CharacterInfo[] array pointed at the same FontTexture -- the game's own glyphs, no font
+    /// file to bundle. Falls back to an OS-font approximation if the asset can't be loaded (e.g.
+    /// a different game version/language pack).
     ///
-    /// First live test (plain white text, no box) confirmed visibility everywhere, including
-    /// over a fully blown-out white scene, but read as too large/bare popping up over the
-    /// hub's own menu list. A follow-up pass added a bordered box, which fixed legibility but
-    /// still read as a generic UI element pasted on top of the game rather than part of it. A
-    /// pass after that faked a pixel-font look by rasterizing an OS font small and magnifying
-    /// it with point filtering -- legible and closer, but still visibly not the game's own
-    /// font.
-    ///
-    /// This version uses the game's *actual* terminal font instead of approximating it.
-    /// AsciiText.FontInit (decompile-confirmed) loads a SHGUIFontAsset via
-    /// Resources.Load("Fonts/SHGUIFontAsset_EU") -- a public ScriptableObject (FontTexture,
-    /// FontDescription, CharSize fields all public) that's just sitting in the game's own
-    /// Resources, loadable by any mod the same way. FontDescription is an AngelCode-BMFont-
-    /// style XML (`<char id x y width height>` per glyph) that AsciiText parses by hand into
-    /// its own Charset lookup table; BuildGameFont() below parses the same XML into a real
-    /// UnityEngine.Font's CharacterInfo[] array instead, pointing a legacy Text component
-    /// straight at the same FontTexture -- the literal glyphs the game's own UI uses, with no
-    /// font file to install or bundle since it's already shipped with the game. Falls back to
-    /// the previous OS-font approximation if the asset can't be loaded for any reason (e.g. a
-    /// different game version/language pack), so a resource lookup miss degrades gracefully
-    /// instead of showing no popup at all. An ASCII box-drawing border (literal '_'/'|'
-    /// characters, matching SUPERHOT's own hub UI) was tried for a few rounds but was pulled
-    /// entirely per direct user feedback once seen live -- see EnsureCanvas's own comment.
-    /// The box is a plain solid-color panel, sized directly from the message's own character
-    /// count rather than any pixel measurement, and the whole thing fades in/out with a brief
-    /// vertical squeeze (full width, near-zero height at the start/end of each transition)
-    /// meant to evoke the game's own CRT/scanline-style screen transitions rather than just
-    /// popping in and out.
+    /// The popup box is a plain solid-color panel sized from the message's character count, and
+    /// fades in/out with a brief vertical squeeze evoking the game's own CRT/scanline transitions.
+    /// See EnsureCanvas's own comment for why there's no border.
     /// </summary>
     public static class PopupOverlay
     {

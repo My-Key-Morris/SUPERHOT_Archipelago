@@ -24,7 +24,7 @@ namespace SuperhotArchipelago.Patches
             // the exception would propagate straight back into whatever native code is building
             // the rest of the menu tree, with nothing useful in the log. Added during "Round
             // 48"'s cold-boot freeze investigation (the actual bug turned out to be elsewhere --
-            // see PopupOverlay.EnsureView's comment) but the risk is real regardless.
+            // see PopupOverlay.EnsureCanvas's comment) but the risk is real regardless.
             try
             {
                 // While Archipelago mode is off, HubUnlockPatch's Postfix already no-ops, so

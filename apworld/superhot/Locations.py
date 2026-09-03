@@ -9,7 +9,6 @@ Regions.py's Victory event location and mod/SuperhotArchipelago/Core/LocationMan
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import NamedTuple
 
 from BaseClasses import Location

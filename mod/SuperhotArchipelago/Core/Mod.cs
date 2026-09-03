@@ -179,15 +179,21 @@ namespace SuperhotArchipelago.Core
             RunStep("Locations.ProcessPendingNotifications", () => Locations?.ProcessPendingNotifications());
             RunStep("NotificationLog.FlushPendingPopups", NotificationLog.FlushPendingPopups);
             RunStep("PopupOverlay.Update", PopupOverlay.Update);
+#if DEBUG
             RunStep("PopupOverlay.DebugHotkey", CheckPopupDebugHotkey);
+#endif
             RunStep("ConnectionButtonPatch.RefreshLabel", Patches.ConnectionButtonPatch.RefreshLabel);
             RunStep("ArchipelagoModeTogglePatch.RefreshLabel", Patches.ArchipelagoModeTogglePatch.RefreshLabel);
         }
 
+#if DEBUG
         // Debug aid for live-tuning PopupOverlay's look (see PopupTuning.cs's own doc comment
         // for why this exists): F9 tears down the current Canvas, reloads PopupTuning.json from
         // disk, and shows a sample string covering mixed case/digits/punctuation, so edits to
         // that file can be eyeballed in-game without a rebuild + redeploy + restart per change.
+        // Debug-only (#if DEBUG) so it never ships in a Release build -- was previously live in
+        // every build with no way to disable it, meaning any player pressing F9 would trigger a
+        // fake "LOCKED" popup.
         private static void CheckPopupDebugHotkey()
         {
             if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.F9))
@@ -196,6 +202,7 @@ namespace SuperhotArchipelago.Core
                 PopupOverlay.Show("LOCKED: 'Sample Level 42' needs an Archipelago item to unlock");
             }
         }
+#endif
 
         private void RunStep(string name, Action step)
         {
@@ -219,7 +226,7 @@ namespace SuperhotArchipelago.Core
             // calls into, e.g. HubUnlockPatch) can't silently abort the rest of scene-load
             // handling -- added after "Round 48"'s cold-boot freeze investigation, which spent
             // a long time ruling out exactly this kind of silent failure before finding the
-            // real cause (see PopupOverlay.EnsureView's comment).
+            // real cause (see PopupOverlay.EnsureCanvas's comment).
             try
             {
                 RunSceneWasLoadedBody(sceneName);

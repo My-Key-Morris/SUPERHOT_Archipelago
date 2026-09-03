@@ -20,7 +20,7 @@ namespace SuperhotArchipelago.Patches
             // into that native loop and silently abort hub construction partway, with nothing
             // useful in the log. "Round 48"'s cold-boot freeze investigation went looking for
             // exactly this kind of failure (it turned out to be a different bug, see
-            // PopupOverlay.EnsureView's comment) but the risk is real regardless, so this stays.
+            // PopupOverlay.EnsureCanvas's comment) but the risk is real regardless, so this stays.
             try
             {
                 if (customName != "" || b == null || element == null)

@@ -34,7 +34,7 @@ namespace SuperhotArchipelago.Patches
             // LockUnfinishedLevels(), silently aborting a larger hub-construction sequence with
             // nothing useful in the log. Added during "Round 48"'s cold-boot freeze
             // investigation (the actual bug turned out to be elsewhere -- see
-            // PopupOverlay.EnsureView's comment) but the risk is real regardless.
+            // PopupOverlay.EnsureCanvas's comment) but the risk is real regardless.
             try
             {
                 RunPostfixBody();

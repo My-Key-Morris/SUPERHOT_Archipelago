@@ -4,7 +4,7 @@ namespace SuperhotArchipelago.Core
 {
     /// <summary>
     /// Native in-game connection screen (server/slot/password) built on SHGUIappbase,
-    /// replacing the old Unity IMGUI popup (Core/ConnectionUI.cs). Text entry mirrors
+    /// replacing the old Unity IMGUI popup. Text entry mirrors
     /// AppSHConsole's own pattern (Input.inputString, backspace/enter handling, blinking
     /// caret) across three Tab-cycled fields instead of one.
     ///
