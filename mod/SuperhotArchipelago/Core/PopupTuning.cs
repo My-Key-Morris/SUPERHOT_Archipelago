@@ -42,8 +42,8 @@ namespace SuperhotArchipelago.Core
         // side (so the total added width is double this value) -- replaced the old pixel-based
         // BorderThickness/TextPadding fields, which sized the panel from a raw pixel amount
         // that could round away to nothing once divided back into whole character cells for an
-        // ASCII border grid this project tried and later removed (see NOTES.md's "Round 49"
-        // entries) -- these size the panel directly in cell units instead, so requested padding
+        // ASCII border grid this project tried and later removed -- these size the panel
+        // directly in cell units instead, so requested padding
         // always survives as whole cells regardless of what's drawn inside it.
         public int PaddingHorizontalCells = 2;
 

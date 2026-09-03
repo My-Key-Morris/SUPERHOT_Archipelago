@@ -1,8 +1,8 @@
 """SUPERHOT world for Archipelago.
 
-See ../../README.md and ../../NOTES.md at the project root for design status and open
-questions -- playtested end-to-end against a real SUPERHOT install (see NOTES.md's
-testing log), but still solo-tested on one machine/one game version, so treat it as beta.
+See ../../README.md at the project root for design status and open questions --
+playtested end-to-end against a real SUPERHOT install, but still solo-tested on one
+machine/one game version, so treat it as beta.
 """
 from __future__ import annotations
 

@@ -7,7 +7,7 @@
 # want to add more players to the same YAML file, or check other games' options.
 
 name: Player1
-description: Sample player file for the SUPERHOT Archipelago world -- see TESTING.md.
+description: Sample player file for the SUPERHOT Archipelago world -- see the README's "Setting it up" section.
 game: SUPERHOT
 
 requires:

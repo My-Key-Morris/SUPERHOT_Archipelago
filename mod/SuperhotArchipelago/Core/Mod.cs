@@ -2,7 +2,7 @@ using System;
 using MelonLoader;
 
 // Matches the strings in SH_Data/app.info exactly.
-[assembly: MelonInfo(typeof(SuperhotArchipelago.Core.Mod), "SuperhotArchipelago", "0.2.0", "My-Key-Morris")]
+[assembly: MelonInfo(typeof(SuperhotArchipelago.Core.Mod), "SuperhotArchipelago", "0.2.1", "My-Key-Morris")]
 [assembly: MelonGame("SUPERHOT_Team", "SUPERHOT")]
 
 namespace SuperhotArchipelago.Core

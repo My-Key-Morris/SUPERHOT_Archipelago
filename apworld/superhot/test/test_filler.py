@@ -1,4 +1,4 @@
-"""Regression coverage for the itempool-size bug documented in NOTES.md's "filler" round.
+"""Regression coverage for a real itempool-size bug found during development.
 
 create_items() silently stopped producing enough items once secret locations pushed the
 real location count past len(LEVELS) -- and nothing in core Archipelago pads this

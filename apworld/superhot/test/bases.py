@@ -15,9 +15,9 @@ Since this project's classes never set custom options, that property silently ev
 False, and test_fill/test_all_state_can_reach_everything/test_empty_state_can_reach_something
 all start with "if not (self.run_default_tests and self.constructed): return" -- so they
 were reporting PASSED while actually never running their bodies at all. That's exactly how
-a real, later-discovered create_items() bug (see NOTES.md's "secrets" round -- the item
-pool stopped matching the location count once secret locations were added, which
-test_fill's own assertions exist specifically to catch) went undetected until someone
+a real, later-discovered create_items() bug -- the item pool stopped matching the
+location count once secret locations were added, which test_fill's own assertions
+exist specifically to catch -- went undetected until someone
 asked how filler was being handled and it got checked by hand. Forcing this to True here
 means every subclass actually runs these checks for real, at the cost of a small amount of
 redundant CPU time against what test/general/ already covers -- worth it for a project this

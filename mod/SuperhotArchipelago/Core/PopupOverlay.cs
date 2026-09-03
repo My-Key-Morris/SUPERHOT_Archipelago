@@ -234,7 +234,7 @@ namespace SuperhotArchipelago.Core
             // characters, matching SUPERHOT's own hub UI) was tried here and lived for a few
             // rounds, but was pulled entirely per direct user feedback ("too much") once seen
             // live against real gameplay -- a plain solid panel reads cleaner. See git history
-            // (or NOTES.md's border-related "Round 49" entries) if that look is ever revisited.
+            // if that look is ever revisited.
             CreateStretchImage(_panel, "Background", T.BackgroundColor, 0f);
 
             Font resolvedFont = ResolveFont();

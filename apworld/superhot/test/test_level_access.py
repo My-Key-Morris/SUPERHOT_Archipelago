@@ -5,8 +5,9 @@ to state a rule for its own access item, not a chain of every earlier level's it
 because the region graph is flat (see Regions.py) and there's no other way to reach a
 later level's item than being able to play up through it. That's true for a linear game
 with one access item per level, but it's exactly the kind of implicit assumption a level
-list edit -- reordering, adding, or removing an entry (see the Cyberspace removal in
-NOTES.md) -- could silently break without anything in Locations.py/Regions.py/Rules.py
+list edit -- reordering, adding, or removing an entry (this project once removed two
+dead "Cyberspace" entries that never had a real hub button) -- could silently break
+without anything in Locations.py/Regions.py/Rules.py
 raising an error. These tests exist to catch that.
 """
 from __future__ import annotations
@@ -79,7 +80,7 @@ class TestLevelAccess(SuperhotTestBase):
     def test_level_count_matches_catalog(self) -> None:
         """Sanity check on the level list itself: 32 real story levels, no duplicate
         names, sequential order starting at 1. Both Cyberspace entries were removed after
-        a playtest confirmed they never get a real hub button (see NOTES.md) -- this would
+        a playtest confirmed they never get a real hub button -- this would
         fail loudly if a future edit reintroduced a gap or a dead entry like that."""
         self.assertEqual(len(LEVELS), 32, "expected exactly 32 real playable levels")
         names = [level["name"] for level in LEVELS]

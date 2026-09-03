@@ -8,7 +8,7 @@ The original SUPERHOT (2016 — not MIND CONTROL DELETE) as a playable game slot
 - SUPERHOT: [Steam Store](https://store.steampowered.com/app/322500)
 - Archipelago: [Releases Page](https://github.com/ArchipelagoMW/Archipelago/releases/latest)
 - This apworld: [GitHub Releases Page](https://github.com/My-Key-Morris/SUPERHOT_Archipelago/releases/latest)
-- The mod: [Nexus Mods](https://www.nexusmods.com/superhot/mods/7)
+- The mod: [Thunderstore](https://thunderstore.io/c/superhot/p/Archihot/SuperhotArchipelago/)
 - [MelonLoader](https://melonwiki.xyz) — the mod loader the in-game half runs on
 
 ## What does randomization do to this game?
@@ -78,18 +78,22 @@ The goal is beating the final level, same as vanilla.
 2. In the Archipelago Launcher, click **Install APWorld** and pick `superhot.apworld`
    from [this project's GitHub releases](https://github.com/My-Key-Morris/SUPERHOT_Archipelago/releases/latest).
    SUPERHOT now shows up as a supported game.
-3. Install [MelonLoader](https://melonwiki.xyz) into your SUPERHOT folder (same folder as
-   `SUPERHOT.exe`), then launch and close SUPERHOT once to finalize it.
-4. Grab the mod from [Nexus Mods](https://www.nexusmods.com/superhot/mods/7) and drop its
-   `Mods` and `UserLibs` folders into your SUPERHOT folder, alongside `SUPERHOT.exe`.
-5. Generate and host a game as usual through the Archipelago Launcher (**Generate**, then
+3. Install the mod from [Thunderstore](https://thunderstore.io/c/superhot/p/Archihot/SuperhotArchipelago/).
+   It declares [MelonLoader](https://melonwiki.xyz) as a required dependency, so a
+   Thunderstore-aware mod manager (r2modman, Gale, the Thunderstore Mod Manager) installs
+   MelonLoader alongside it automatically and drops the `Mods`/`UserLibs` contents
+   straight into your SUPERHOT install. Installing by hand instead? Grab MelonLoader
+   yourself first, install it into your SUPERHOT folder (same folder as `SUPERHOT.exe`),
+   launch and close SUPERHOT once to finalize it, then unzip the mod's package and copy
+   its `Mods` and `UserLibs` folders in the same way.
+4. Generate and host a game as usual through the Archipelago Launcher (**Generate**, then
    **Host** on the resulting `.zip`) — or join an already-hosted room.
-6. Launch SUPERHOT. MelonLoader prints console output on top of the game — look for
+5. Launch SUPERHOT. MelonLoader prints console output on top of the game — look for
    lines starting with `[SuperhotArchipelago]` confirming it loaded.
-7. On the hub's main screen, open the `ARCHIPELAGO` folder and select `CONNECT`, then
+6. On the hub's main screen, open the `ARCHIPELAGO` folder and select `CONNECT`, then
    enter your server/slot/password. `Tab`/`Enter` move between fields, `Enter` on the
    last field connects, `Esc` closes the screen. Settings save automatically.
-8. Play the first level. A line in the MelonLoader console confirming a check was sent is
+7. Play the first level. A line in the MelonLoader console confirming a check was sent is
    the sign everything's wired up correctly.
 
 </details>

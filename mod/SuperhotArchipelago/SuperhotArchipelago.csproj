@@ -26,7 +26,7 @@
       3. A local, gitignored SuperhotArchipelago.csproj.user file (MSBuild loads this
          automatically if present) setting SuperhotGameDir inside a PropertyGroup, the
          usual place per-developer local settings like this live.
-    See TESTING.md/ARCHITECTURE.md for the full build command.
+    Full example: dotnet build -c Release -p:SuperhotGameDir="C:\path\to\SUPERHOT"
   -->
   <PropertyGroup>
     <SuperhotGameDir Condition="'$(SuperhotGameDir)' == ''">$(SUPERHOT_GAME_DIR)</SuperhotGameDir>
