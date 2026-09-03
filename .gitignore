@@ -27,6 +27,12 @@ Thumbs.db
 /NOTES.md
 /MOD_GUIDE.md
 
+# Release-notes staging doc -- kept locally only (explicit user request), not pushed to
+# GitHub. Unlike the other gitignored docs above, this one is meant to become public
+# content eventually (copied into GitHub Release notes), it just isn't tracked as a repo
+# file itself.
+/CHANGELOG.md
+
 # Packaged mod release zips (Nexus and Thunderstore alike) -- these are built
 # distribution artifacts (Mods/ + UserLibs/, built from mod/SuperhotArchipelago's own
 # build output), not source, and don't belong in git history. They get attached to
