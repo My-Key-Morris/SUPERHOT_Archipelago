@@ -31,6 +31,14 @@ namespace SuperhotArchipelago.Core
         public static MelonPreferences_Entry<bool> NotifyFiller { get; private set; } = null!;
         public static MelonPreferences_Entry<bool> NotifyTrap { get; private set; } = null!;
 
+        // How many seconds after the "SUPERHOT SUPERHOT" ending sequence starts to ignore
+        // the skip button entirely -- see Patches/EndingClickBufferPatch.cs. Punching (SUPERHOT's
+        // melee input) is left-click, same button used to skip/click through the ending, so
+        // finishing off the last enemy with a flurry of clicks could otherwise register as
+        // "click to skip" and yank the player out of the level a heartbeat after their last
+        // kill. Tunable here in case the default feels too short/long for a given playstyle.
+        public static MelonPreferences_Entry<float> EndingClickBufferSeconds { get; private set; } = null!;
+
         public static void Load()
         {
             _category = MelonPreferences.CreateCategory(
@@ -61,6 +69,11 @@ namespace SuperhotArchipelago.Core
             NotifyTrap = _category.CreateEntry(
                 "NotifyTrap", true, "NotifyTrap",
                 "Popup for trap items.");
+            EndingClickBufferSeconds = _category.CreateEntry(
+                "EndingClickBufferSeconds", 1.5f, "EndingClickBufferSeconds",
+                "Seconds after a level's ending sequence starts before a click can skip " +
+                "through it. Higher values give more protection against finishing-blow " +
+                "clicks accidentally skipping ahead; 0 disables the buffer entirely.");
 
             _category.SaveToFile(printmsg: false);
         }
