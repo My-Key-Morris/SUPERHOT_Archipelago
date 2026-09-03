@@ -19,13 +19,13 @@ namespace SuperhotArchipelago.Core
     /// </summary>
     public class PopupTuning
     {
-        public float DisplaySeconds = 2.5f;
+        public float DisplaySeconds = 3f;
         public float TransitionSeconds = 0.12f;
-        public float MinScaleY = 0.05f;
+        public float MinScaleY = 0.01f;
         public int FontSize = 16;
-        public float PixelScale = 1.6f;
+        public float PixelScale = 0.9f;
         public float TextVerticalNudgeFraction = 0.48f;
-        public float TopAnchorY = 0.9f;
+        public float TopAnchorY = 0.95f;
 
         // Fraction of the reference screen width/height (ReferenceWidth/ReferenceHeight in
         // PopupOverlay.cs, 1920x1080) the popup panel may not exceed -- real, explicit user
@@ -35,8 +35,8 @@ namespace SuperhotArchipelago.Core
         // width instead wraps onto additional lines (see PopupOverlay.WrapText); height has no
         // equivalent reflow, so MaxHeightFraction is a hard clamp on the panel's final pixel
         // size instead, for the rare pathologically long/multi-line message.
-        public float MaxWidthFraction = 0.6f;
-        public float MaxHeightFraction = 0.5f;
+        public float MaxWidthFraction = 1f;
+        public float MaxHeightFraction = 0.08f;
 
         // Extra blank character cells between the message text and the panel's edges on each
         // side (so the total added width is double this value) -- replaced the old pixel-based
@@ -54,12 +54,12 @@ namespace SuperhotArchipelago.Core
         // font atlas has no real per-glyph baseline data to justify any specific value, so this
         // starts at 0 (off) until tuned live via F9 + editing this file. Same raw cell-pixel
         // units as CharSize (typically ~38px tall cells); positive values shift capitals down.
-        public float CapitalLetterNudge = 0f;
+        public float CapitalLetterNudge = -1f;
 
         public float BackgroundR = 0f;
         public float BackgroundG = 0.01f;
         public float BackgroundB = 0.02f;
-        public float BackgroundA = 0.92f;
+        public float BackgroundA = 0.75f;
 
         [JsonIgnore]
         public Color BackgroundColor => new Color(BackgroundR, BackgroundG, BackgroundB, BackgroundA);
